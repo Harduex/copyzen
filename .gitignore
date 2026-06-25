@@ -1,0 +1,15 @@
+# Build output
+/copyzen
+/dist-build/
+copyzen-linux-*
+*.test
+*.out
+coverage*
+
+# Local agent skills (personal — not published with the project)
+/.claude/
+
+# Editor / OS cruft
+*.swp
+*~
+.DS_Store
