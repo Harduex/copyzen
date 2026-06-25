@@ -14,6 +14,14 @@ prefix="${PREFIX:-/usr/local/bin}"
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
+# Don't run the whole script under sudo: the build must run as you (building as root
+# breaks the Go toolchain/cache). This script elevates only the install step itself.
+if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then
+	echo "Run as your normal user, NOT with sudo — I build as you and sudo only the install:" >&2
+	echo "  scripts/copyzen-devinstall ${*:-install}" >&2
+	exit 1
+fi
+
 # Install to PREFIX, using sudo only when PREFIX isn't writable by the current user.
 put() { # src destname mode
 	if [ -w "$prefix" ]; then install -m "$3" "$1" "$prefix/$2"; else sudo install -m "$3" "$1" "$prefix/$2"; fi
