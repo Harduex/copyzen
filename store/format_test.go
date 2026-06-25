@@ -53,10 +53,10 @@ func TestParseID(t *testing.T) {
 }
 
 func TestFormatLineActive(t *testing.T) {
-	if got := FormatLine(Entry{ID: 1, Preview: "x", Active: true}); got != "1\t● x" {
+	if got := FormatLine(Entry{ID: 1, Preview: "x", Active: true}); got != "1\tx •" {
 		t.Errorf("active: got %q", got)
 	}
-	if got := FormatLine(Entry{ID: 2, Preview: "x", Pinned: true, Active: true}); got != "2\t★ ● x" {
+	if got := FormatLine(Entry{ID: 2, Preview: "x", Pinned: true, Active: true}); got != "2\t★ x •" {
 		t.Errorf("pinned+active: got %q", got)
 	}
 }
