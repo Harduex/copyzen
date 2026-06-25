@@ -90,7 +90,7 @@ for dep in wl-paste wl-copy fuzzel; do
 	command -v "$dep" >/dev/null 2>&1 || warn "'$dep' not found — install it (wl-clipboard provides wl-paste/wl-copy; fuzzel is its own package)."
 done
 if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
-	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+P pinning still works; update fuzzel to hide it."
+	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+S pinning still works; update fuzzel to hide it."
 fi
 
 if pgrep -f 'wl-paste --watch.*copyzen store$' >/dev/null 2>&1; then
@@ -113,7 +113,7 @@ Bind Super+V in COSMIC:
     Command : copyzen-menu
     Shortcut: Super+V
 
-Pinning: open the picker (Super+V), highlight an entry, press Ctrl+P. Pinned
+Pinning: open the picker (Super+V), highlight an entry, press Ctrl+S. Pinned
 entries show a ★ at the top and survive history rollover. Unpin from a terminal:
   copyzen list          # find the ★ entry's id
   echo <id> | copyzen unpin

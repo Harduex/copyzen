@@ -1,6 +1,6 @@
 #!/bin/sh
 # copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
-# Enter = copy selection, Ctrl+P = pin selection (reopens), Esc/cancel = quit.
+# Enter = copy selection, Ctrl+S = pin selection (reopens), Esc/cancel = quit.
 # No `set -e`: fuzzel's non-zero exits (pin=10, cancel=1) are control flow, not errors.
 set -u
 

@@ -73,7 +73,7 @@ clipboard; **Esc** dismisses.
 
 ## Pinning
 
-Pins survive history rollover. In the picker, highlight an entry and press **Ctrl+P** — it
+Pins survive history rollover. In the picker, highlight an entry and press **Ctrl+S** — it
 is copied into a separate `pinned` store and shown with a `★` at the top of the list. The
 rolling history can fill up and evict old entries; pins are never touched.
 
