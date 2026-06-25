@@ -1,6 +1,15 @@
 package store
 
-import "testing"
+import (
+	"bytes"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
+	"testing"
+
+	"golang.org/x/image/bmp"
+)
 
 func TestSniffImage(t *testing.T) {
 	cases := []struct {
@@ -28,6 +37,59 @@ func TestSniffImage(t *testing.T) {
 				t.Errorf("SniffImage(%q) = (%q,%q,%v), want (%q,%q,%v)", c.in, mime, ext, ok, c.mime, c.ext, c.ok)
 			}
 		})
+	}
+}
+
+func encPNG(t *testing.T, w, h int) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	if err := png.Encode(&b, image.NewRGBA(image.Rect(0, 0, w, h))); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+func TestThumbnail(t *testing.T) {
+	// landscape 400x200 -> longest side clamped to 128 -> 128x64
+	src := encPNG(t, 400, 200)
+	out, err := Thumbnail(src, 128)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := image.Decode(bytes.NewReader(out))
+	if err != nil {
+		t.Fatalf("thumbnail is not a decodable image: %v", err)
+	}
+	if got := img.Bounds().Dx(); got != 128 {
+		t.Errorf("width: got %d want 128", got)
+	}
+	if got := img.Bounds().Dy(); got != 64 {
+		t.Errorf("height: got %d want 64", got)
+	}
+}
+
+func TestThumbnailFormats(t *testing.T) {
+	rgba := image.NewRGBA(image.Rect(0, 0, 20, 20))
+	var jpg, g, bm bytes.Buffer
+	if err := jpeg.Encode(&jpg, rgba, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := gif.Encode(&g, rgba, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := bmp.Encode(&bm, rgba); err != nil {
+		t.Fatal(err)
+	}
+	for name, src := range map[string][]byte{"jpeg": jpg.Bytes(), "gif": g.Bytes(), "bmp": bm.Bytes()} {
+		if _, err := Thumbnail(src, 128); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestThumbnailUndecodable(t *testing.T) {
+	if _, err := Thumbnail([]byte("not an image"), 128); err == nil {
+		t.Error("want error for undecodable input")
 	}
 }
 

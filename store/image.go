@@ -2,9 +2,20 @@ package store
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"strconv"
 	"strings"
+
+	_ "image/gif"
+	_ "image/jpeg"
+
+	"golang.org/x/image/draw"
+
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
 )
 
 // SniffImage reports the image MIME type and file extension of b by inspecting its
@@ -42,4 +53,42 @@ func humanSize(n int) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGT"[exp])
+}
+
+// ThumbMax is the longest-side pixel cap for cached thumbnails.
+const ThumbMax = 128
+
+// Thumbnail decodes src (png/jpeg/gif/webp/bmp), downscales it so the longest side is
+// at most maxPx (never upscaling, aspect preserved), and re-encodes it as PNG.
+func Thumbnail(src []byte, maxPx int) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(src))
+	if err != nil {
+		return nil, err
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w == 0 || h == 0 {
+		return nil, errors.New("copyzen: empty image")
+	}
+	tw, th := w, h
+	if w > maxPx || h > maxPx {
+		if w >= h {
+			tw, th = maxPx, h*maxPx/w
+		} else {
+			tw, th = w*maxPx/h, maxPx
+		}
+		if tw < 1 {
+			tw = 1
+		}
+		if th < 1 {
+			th = 1
+		}
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, tw, th))
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, b, draw.Over, nil)
+	var out bytes.Buffer
+	if err := png.Encode(&out, dst); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
