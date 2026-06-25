@@ -6,8 +6,14 @@ copyzen-linux-*
 *.out
 coverage*
 
-# Local agent skills (personal — not published with the project)
-/.claude/
+# Local agent skills (personal — not published) — except the project-specific release runbook
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/shipping-a-release/
+
+# Agent scratch (SDD ledgers, task briefs/reports)
+/.superpowers/
 
 # Editor / OS cruft
 *.swp
