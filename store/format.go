@@ -6,18 +6,18 @@ import (
 	"strings"
 )
 
-// FormatLine renders one list row as "id<TAB>preview". A pinned row keeps the star (★) as
-// the leading char (the clear-confirm pin count relies on a leading ★). The live-clipboard
-// row gets a trailing dot (•) on the right, so neither marker shifts the entry text.
+// FormatLine renders one list row as "id<TAB>preview". A pinned row prefixes the preview
+// with a star (★) and the live-clipboard row with a small dot (•), in that order — so a
+// pinned row always starts with ★ (the clear-confirm pin count relies on a leading ★).
 func FormatLine(e Entry) string {
-	preview := e.Preview
+	prefix := ""
 	if e.Pinned {
-		preview = "★ " + preview
+		prefix += "★ "
 	}
 	if e.Active {
-		preview += " •"
+		prefix += "• "
 	}
-	return strconv.FormatUint(e.ID, 10) + "\t" + preview
+	return strconv.FormatUint(e.ID, 10) + "\t" + prefix + e.Preview
 }
 
 // FormatLineIcon renders a list row, appending Rofi's extended dmenu icon marker

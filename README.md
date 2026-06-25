@@ -78,7 +78,7 @@ In the picker:
 - **Ctrl+Shift+C** — clear ALL history (pinned entries are kept). A confirm view appears; press **Enter** to confirm, **Esc** to cancel.
 - **Esc** — quit.
 
-The entry currently on your clipboard is marked with a trailing **•** dot, so you can spot it even after moving the highlight.
+The entry currently on your clipboard is marked with a leading **•** dot, so you can spot it even after moving the highlight.
 
 Copied **images** (PNG/JPEG/GIF/WebP/BMP) show a thumbnail in the picker (cached under
 `$XDG_CACHE_HOME/copyzen/thumbs`) and paste back with their correct type.
