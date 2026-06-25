@@ -85,9 +85,6 @@ fi
 for dep in wl-paste wl-copy fuzzel; do
 	command -v "$dep" >/dev/null 2>&1 || warn "'$dep' not found — install it (wl-clipboard provides wl-paste/wl-copy; fuzzel is its own package)."
 done
-if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
-	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+S pinning still works; update fuzzel to hide it."
-fi
 
 # Recorder: start now + on every login. Prefer a systemd --user service (auto-restarts on
 # crash); fall back to an XDG autostart entry where a systemd --user instance isn't usable.

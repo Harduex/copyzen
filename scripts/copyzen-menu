@@ -5,63 +5,69 @@
 #   Shift+Delete   delete selection      (confirm: press Enter, Esc cancels)
 #   Ctrl+Shift+C   clear ALL history     (confirm: press Enter, Esc cancels)
 #   Esc            quit
-# fuzzel exits on every action key and cannot reload its list, so each action
-# relaunches fuzzel; confirmations relaunch into a confirm-state view. Pinned items
-# are never cleared by Ctrl+Shift+C — remove them one-by-one with Ctrl+D.
+# fuzzel exits on every action key and cannot reload its list, so each action relaunches
+# it; confirmations relaunch into a confirm-state view.
+#
+# The id column is hidden from the picker (so image thumbnails aren't crowded against the
+# id): copyzen emits "id<TAB>preview[\0icon\x1f<path>]" to a temp file — a file, because
+# shell variables/command-substitution strip the NUL the icon protocol needs — and we show
+# fuzzel only field 2+ (preview + icon), then map fuzzel's --index back to the id.
 # No `set -e`: fuzzel's non-zero exits are control flow, not errors.
 set -u
 
 config="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen/fuzzel.ini"
-
-# Base args for every fuzzel call. --with-nth (hides the id column) needs a newer
-# fuzzel and is purely cosmetic, so it is added only to the main list, not the
-# single-line confirm views (where there is no id column to hide).
-set -- --dmenu --config "$config"
-withnth=
-if fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
-	withnth=--with-nth=2
-fi
+rows=$(mktemp "${TMPDIR:-/tmp}/copyzen-menu.XXXXXX")
+trap 'rm -f "$rows"' EXIT INT TERM
 
 state=list
-sel=
+id=
+idx=
 
 while :; do
 	case "$state" in
 	list)
-		# Pipe the current clipboard in so copyzen can mark the live entry (●).
-		sel=$(wl-paste --no-newline 2>/dev/null | copyzen list --mark-active | fuzzel "$@" $withnth)
-		case "$?" in
-		0)  if [ -n "$sel" ]; then
-				t=$(printf '%s' "$sel" | copyzen mimetype)
+		wl-paste --no-newline 2>/dev/null | copyzen list --mark-active > "$rows"
+		idx=$(cut -f2- "$rows" | fuzzel --dmenu --config "$config" --index)
+		code=$?
+		# Map the selected 0-based index back to its id (empty if nothing was selected;
+		# fuzzel prints -1 / non-numeric when the input matched no entry).
+		id=
+		case "$idx" in
+		'' | *[!0-9]*) ;;
+		*) id=$(sed -n "$((idx + 1))p" "$rows" | cut -f1) ;;
+		esac
+		case "$code" in
+		0)  if [ -n "$id" ]; then
+				t=$(printf '%s' "$id" | copyzen mimetype)
 				if [ -n "$t" ]; then
-					printf '%s' "$sel" | copyzen decode | wl-copy --type "$t"
+					printf '%s' "$id" | copyzen decode | wl-copy --type "$t"
 				else
-					printf '%s' "$sel" | copyzen decode | wl-copy
+					printf '%s' "$id" | copyzen decode | wl-copy
 				fi
 			fi
 			exit 0 ;;
-		10) [ -n "$sel" ] && printf '%s' "$sel" | copyzen toggle ;;
-		11) [ -n "$sel" ] && state=confirm-delete ;;
+		10) [ -n "$id" ] && printf '%s' "$id" | copyzen toggle ;;
+		11) [ -n "$id" ] && state=confirm-delete ;;
 		12) state=confirm-clear ;;
 		*)  exit 0 ;;
 		esac
 		;;
 	confirm-delete)
-		# Show only the targeted entry's preview (strip "id<TAB>"). Enter (exit 0)
-		# confirms; Esc/anything else cancels. Deletes the captured id.
-		preview=$(printf '%s' "$sel" | sed 's/^[0-9]*	//')
-		printf '%s\n' "$preview" | fuzzel "$@" \
-			--prompt '🗑 Delete? Enter = confirm · Esc = cancel ' >/dev/null
-		[ "$?" -eq 0 ] && printf '%s' "$sel" | copyzen delete
+		# Show only the targeted row's preview (with its thumbnail). Enter (exit 0) confirms;
+		# Esc/anything else cancels. Deletes the captured id.
+		sed -n "$((idx + 1))p" "$rows" | cut -f2- |
+			fuzzel --dmenu --config "$config" --prompt '🗑 Delete? Enter = confirm · Esc = cancel ' >/dev/null
+		[ "$?" -eq 0 ] && printf '%s' "$id" | copyzen delete
 		state=list
 		;;
 	confirm-clear)
 		# Hide the list, show counts + a warning. Enter (exit 0) confirms; Esc cancels.
-		counts=$(copyzen list | tr -d '\0' | awk -F'	' '
+		# Pinned rows start with ★ (after the id column); strip NUL before counting.
+		counts=$(tr -d '\0' < "$rows" | awk -F'	' '
 			{ total++; if ($2 ~ /^★/) pinned++ }
 			END { printf "%d history items · %d pinned kept", total - pinned, pinned }')
-		printf 'Clear %s\n' "$counts" | fuzzel "$@" \
-			--prompt '⚠ Clear ALL history? Enter = confirm · Esc = cancel ' >/dev/null
+		printf 'Clear %s\n' "$counts" |
+			fuzzel --dmenu --config "$config" --prompt '⚠ Clear ALL history? Enter = confirm · Esc = cancel ' >/dev/null
 		[ "$?" -eq 0 ] && copyzen wipe
 		state=list
 		;;
