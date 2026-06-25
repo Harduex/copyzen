@@ -117,10 +117,10 @@ func TestRunListMarkActive(t *testing.T) {
 	}
 	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
 	// newest-first: beta (id 2) then alpha (id 1); alpha is the clipboard
-	if strings.Contains(lines[0], "●") {
+	if strings.Contains(lines[0], "•") {
 		t.Errorf("beta (not clipboard) should have no dot: %q", lines[0])
 	}
-	if !strings.Contains(lines[1], "●") {
+	if !strings.Contains(lines[1], "•") {
 		t.Errorf("alpha (clipboard) should carry the dot: %q", lines[1])
 	}
 }
