@@ -171,3 +171,21 @@ func (s *Store) Get(id uint64) ([]byte, error) {
 	}
 	return out, nil
 }
+
+// List returns pinned entries (newest pin first) followed by history entries
+// (newest first). bbolt iterates ascending, so reverse iteration gives newest-first.
+func (s *Store) List() ([]Entry, error) {
+	var entries []Entry
+	err := s.db.View(func(tx *bolt.Tx) error {
+		appendBucket := func(name string, pinned bool) {
+			c := tx.Bucket([]byte(name)).Cursor()
+			for k, v := c.Last(); k != nil; k, v = c.Prev() {
+				entries = append(entries, Entry{ID: btoi(k), Pinned: pinned, Preview: Preview(v)})
+			}
+		}
+		appendBucket(bucketPinned, true)
+		appendBucket(bucketHistory, false)
+		return nil
+	})
+	return entries, err
+}

@@ -138,3 +138,25 @@ func TestEvictionRespectsCap(t *testing.T) {
 		}
 	}
 }
+
+func TestListNewestFirst(t *testing.T) {
+	s := newTestStore(t)
+	for _, p := range []string{"one", "two", "three"} {
+		_ = s.Add([]byte(p), 100)
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("want 3 entries, got %d", len(entries))
+	}
+	if entries[0].Preview != "three" || entries[2].Preview != "one" {
+		t.Errorf("not newest-first: %+v", entries)
+	}
+	for _, e := range entries {
+		if e.Pinned {
+			t.Error("nothing pinned yet")
+		}
+	}
+}
