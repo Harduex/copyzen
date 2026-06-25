@@ -94,23 +94,26 @@ func TestAddSkipsEmpty(t *testing.T) {
 	}
 }
 
-func TestAddDedupsConsecutive(t *testing.T) {
+func TestAddDedupMovesToTop(t *testing.T) {
 	s := newTestStore(t)
-	_ = s.Add([]byte("x"), 100)
-	_ = s.Add([]byte("x"), 100) // deduped
-	_ = s.Add([]byte("y"), 100)
-	_ = s.Add([]byte("x"), 100) // non-consecutive: kept
-	if _, err := s.Get(1); err != nil {
-		t.Error("id 1 missing")
-	}
-	if _, err := s.Get(2); err != nil {
-		t.Error("id 2 missing")
+	_ = s.Add([]byte("x"), 100) // id 1
+	_ = s.Add([]byte("x"), 100) // dup of id 1 -> id 1 removed, id 2 added
+	_ = s.Add([]byte("y"), 100) // id 3
+	_ = s.Add([]byte("x"), 100) // dup of id 2 -> id 2 removed, id 4 added (x back on top)
+	for _, gone := range []uint64{1, 2} {
+		if _, err := s.Get(gone); err != ErrNotFound {
+			t.Errorf("id %d should have been deduped away, got %v", gone, err)
+		}
 	}
 	if _, err := s.Get(3); err != nil {
-		t.Error("id 3 missing")
+		t.Error("y (id 3) should exist")
 	}
-	if _, err := s.Get(4); err != ErrNotFound {
-		t.Errorf("expected only 3 entries, got id 4: %v", err)
+	if _, err := s.Get(4); err != nil {
+		t.Error("latest x (id 4) should exist")
+	}
+	entries, _ := s.List()
+	if len(entries) != 2 || entries[0].Preview != "x" || entries[1].Preview != "y" {
+		t.Errorf("want [x, y] newest-first, got %+v", entries)
 	}
 }
 
@@ -474,5 +477,27 @@ func TestActive(t *testing.T) {
 	_ = s.Pin(1) // pinned copy of "alpha" -> id 3
 	if id, _ := s.Active([]byte("alpha")); id != 3 {
 		t.Errorf("active alpha should resolve to the pin (id 3): got %d", id)
+	}
+}
+
+func TestListDedupsHistory(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("dup"), 100)
+	// Inject a second identical history entry directly, bypassing Add's dedup, to mimic
+	// legacy duplicates already in the store.
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(bucketHistory)).Put(itob(999), []byte("dup"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := s.List()
+	n := 0
+	for _, e := range entries {
+		if e.Preview == "dup" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("duplicate payload should be listed once, got %d", n)
 	}
 }

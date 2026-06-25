@@ -135,16 +135,28 @@ func lookup(tx *bolt.Tx, id uint64) []byte {
 	return nil
 }
 
-// Add stores payload in history. Empty input is skipped; a payload identical to the
-// most-recent history entry is deduped.
+// Add stores payload at the top of history. Empty input is skipped. Re-copying a value
+// already in history is a move-to-top: every existing history entry with the same payload
+// is removed first, so the list never accumulates duplicates of the same text.
 func (s *Store) Add(payload []byte, capN int) error {
 	if len(payload) == 0 {
 		return nil
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		h := tx.Bucket([]byte(bucketHistory))
-		if k, v := h.Cursor().Last(); k != nil && bytes.Equal(v, payload) {
-			return nil
+		// Collect keys of existing duplicates (cursor keys are only valid during the
+		// scan, so copy them) and delete them before inserting the fresh entry on top.
+		var dups [][]byte
+		c := h.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if bytes.Equal(v, payload) {
+				dups = append(dups, append([]byte(nil), k...))
+			}
+		}
+		for _, k := range dups {
+			if err := h.Delete(k); err != nil {
+				return err
+			}
 		}
 		id, err := nextID(tx)
 		if err != nil {
@@ -207,22 +219,24 @@ func entryFrom(id uint64, pinned bool, v []byte) Entry {
 }
 
 // List returns pinned entries (newest pin first) followed by history entries
-// (newest first), hiding any history entry whose payload is already pinned so it is
-// not shown twice. bbolt iterates ascending, so reverse iteration gives newest-first.
+// (newest first). Each distinct payload is shown once: a history entry is hidden if its
+// payload is already pinned or already shown by a newer history entry. bbolt iterates
+// ascending, so reverse iteration gives newest-first.
 func (s *Store) List() ([]Entry, error) {
 	var entries []Entry
 	err := s.db.View(func(tx *bolt.Tx) error {
-		pinned := map[string]bool{}
+		seen := map[string]bool{}
 		pc := tx.Bucket([]byte(bucketPinned)).Cursor()
 		for k, v := pc.Last(); k != nil; k, v = pc.Prev() {
-			pinned[string(v)] = true
+			seen[string(v)] = true
 			entries = append(entries, entryFrom(btoi(k), true, v))
 		}
 		hc := tx.Bucket([]byte(bucketHistory)).Cursor()
 		for k, v := hc.Last(); k != nil; k, v = hc.Prev() {
-			if pinned[string(v)] {
+			if seen[string(v)] {
 				continue
 			}
+			seen[string(v)] = true
 			entries = append(entries, entryFrom(btoi(k), false, v))
 		}
 		return nil
