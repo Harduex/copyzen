@@ -189,3 +189,39 @@ func (s *Store) List() ([]Entry, error) {
 	})
 	return entries, err
 }
+
+// Pin copies the payload identified by id into the pinned bucket under a new id.
+// It is a no-op when an identical payload is already pinned, so re-pinning never
+// duplicates. The history copy is left untouched.
+func (s *Store) Pin(id uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		payload := lookup(tx, id)
+		if payload == nil {
+			return ErrNotFound
+		}
+		p := tx.Bucket([]byte(bucketPinned))
+		c := p.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if bytes.Equal(v, payload) {
+				return nil
+			}
+		}
+		newID, err := nextID(tx)
+		if err != nil {
+			return err
+		}
+		return p.Put(itob(newID), payload)
+	})
+}
+
+// Unpin removes id from the pinned bucket.
+func (s *Store) Unpin(id uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		p := tx.Bucket([]byte(bucketPinned))
+		key := itob(id)
+		if p.Get(key) == nil {
+			return ErrNotFound
+		}
+		return p.Delete(key)
+	})
+}

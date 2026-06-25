@@ -160,3 +160,47 @@ func TestListNewestFirst(t *testing.T) {
 		}
 	}
 }
+
+func TestPinUnpin(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("keep me"), 100) // id 1
+
+	if err := s.Pin(1); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := s.List()
+	if len(entries) != 2 || !entries[0].Pinned || entries[0].Preview != "keep me" {
+		t.Fatalf("pinned copy should be first: %+v", entries)
+	}
+	pinnedID := entries[0].ID
+	got, _ := s.Get(pinnedID)
+	if string(got) != "keep me" {
+		t.Errorf("pinned payload = %q", got)
+	}
+
+	// Pinning the same payload again is a no-op.
+	if err := s.Pin(1); err != nil {
+		t.Fatal(err)
+	}
+	if entries, _ := s.List(); len(entries) != 2 {
+		t.Errorf("re-pin duplicated: %d entries", len(entries))
+	}
+
+	if err := s.Unpin(pinnedID); err != nil {
+		t.Fatal(err)
+	}
+	if entries, _ := s.List(); len(entries) != 1 || entries[0].Pinned {
+		t.Errorf("unpin failed: %+v", entries)
+	}
+}
+
+func TestPinUnknownAndUnpinNotPinned(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("x"), 100) // id 1, history only
+	if err := s.Pin(999); err != ErrNotFound {
+		t.Errorf("pin unknown: want ErrNotFound, got %v", err)
+	}
+	if err := s.Unpin(1); err != ErrNotFound {
+		t.Errorf("unpin a non-pinned id: want ErrNotFound, got %v", err)
+	}
+}
