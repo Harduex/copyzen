@@ -317,3 +317,44 @@ func TestWipeKeepsPins(t *testing.T) {
 		t.Fatalf("wipe should leave only the pin: %+v", entries)
 	}
 }
+
+func TestEvictionCapFallback(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i < DefaultCap+1; i++ {
+		if err := s.Add([]byte{byte(i % 256), byte(i / 256)}, 0); err != nil { // cap 0 → fall back to DefaultCap
+			t.Fatal(err)
+		}
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != DefaultCap {
+		t.Fatalf("cap<=0 should fall back to DefaultCap=%d, got %d", DefaultCap, len(entries))
+	}
+	if _, err := s.Get(1); err != ErrNotFound {
+		t.Error("oldest (id 1) should be evicted under the fallback cap")
+	}
+}
+
+func TestAddDedupScopeIsHistoryOnly(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("x"), 100) // id 1 in history
+	_ = s.Pin(1)                // id 2: pinned copy of "x"
+	if err := s.Wipe(); err != nil {
+		t.Fatal(err)
+	}
+	// History is now empty; "x" exists only as a pin. Re-adding "x" must store it —
+	// dedup compares against the most-recent history entry, never the pinned bucket.
+	_ = s.Add([]byte("x"), 100)
+	entries, _ := s.List()
+	hist := 0
+	for _, e := range entries {
+		if !e.Pinned {
+			hist++
+		}
+	}
+	if hist != 1 {
+		t.Fatalf("re-adding a payload that exists only as a pin must store it; got %d history entries", hist)
+	}
+}
