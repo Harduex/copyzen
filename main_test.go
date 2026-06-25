@@ -47,3 +47,28 @@ func TestRunUnknown(t *testing.T) {
 		t.Error("unknown command should error")
 	}
 }
+
+func TestRunMimetype(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	png := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(png), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"store"}, strings.NewReader("plain text"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	// id 1 = image, id 2 = text
+	var img, txt bytes.Buffer
+	if err := run([]string{"mimetype"}, strings.NewReader("1"), &img); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(img.String()) != "image/png" {
+		t.Errorf("image mimetype: got %q want image/png", img.String())
+	}
+	if err := run([]string{"mimetype"}, strings.NewReader("2"), &txt); err != nil {
+		t.Fatal(err)
+	}
+	if txt.String() != "" {
+		t.Errorf("text mimetype: got %q want empty", txt.String())
+	}
+}

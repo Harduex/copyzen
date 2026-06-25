@@ -16,7 +16,7 @@ var version = "dev"
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: copyzen {store|list|decode|delete|pin|unpin|toggle|wipe|version}")
+		return fmt.Errorf("usage: copyzen {store|list|decode|delete|pin|unpin|toggle|wipe|mimetype|version}")
 	}
 	cmd := args[0]
 	if cmd == "version" {
@@ -59,6 +59,20 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 		_, err = stdout.Write(data)
 		return err
+	case "mimetype":
+		id, err := readID(stdin)
+		if err != nil {
+			return err
+		}
+		data, err := s.Get(id)
+		if err != nil {
+			return err
+		}
+		if mime, _, ok := store.SniffImage(data); ok {
+			_, err = fmt.Fprintln(stdout, mime)
+			return err
+		}
+		return nil
 	case "delete":
 		id, err := readID(stdin)
 		if err != nil {
