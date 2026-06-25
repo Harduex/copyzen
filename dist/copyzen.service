@@ -1,0 +1,12 @@
+[Unit]
+Description=copyzen clipboard recorder (wl-paste watcher)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env wl-paste --watch --no-newline copyzen store
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,24 @@
+#!/bin/sh
+# copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
+# Enter = copy selection, Ctrl+P = pin selection (reopens), Esc/cancel = quit.
+# No `set -e`: fuzzel's non-zero exits (pin=10, cancel=1) are control flow, not errors.
+set -u
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen/fuzzel.ini"
+
+# --with-nth hides the id column; it needs a newer fuzzel and is purely cosmetic.
+set -- --dmenu --config "$config"
+if fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
+	set -- "$@" --with-nth=2
+fi
+
+while :; do
+	sel=$(copyzen list | fuzzel "$@")
+	code=$?
+	case "$code" in
+		0)  [ -n "$sel" ] && printf '%s' "$sel" | copyzen decode | wl-copy
+			exit 0 ;;
+		10) [ -n "$sel" ] && printf '%s' "$sel" | copyzen pin ;;
+		*)  exit 0 ;;
+	esac
+done
