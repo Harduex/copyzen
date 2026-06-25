@@ -15,6 +15,17 @@ func FormatLine(e Entry) string {
 	return strconv.FormatUint(e.ID, 10) + "\t" + e.Preview
 }
 
+// FormatLineIcon renders a list row, appending Rofi's extended dmenu icon marker
+// (\0icon\x1f<path>) when iconPath is non-empty so fuzzel shows a thumbnail. fuzzel
+// prints back only the text part (before the NUL) on selection, so ParseID is unaffected.
+func FormatLineIcon(e Entry, iconPath string) string {
+	line := FormatLine(e)
+	if iconPath == "" {
+		return line
+	}
+	return line + "\x00icon\x1f" + iconPath
+}
+
 // RenderList renders entries as newline-terminated FormatLine rows.
 func RenderList(entries []Entry) string {
 	var b strings.Builder

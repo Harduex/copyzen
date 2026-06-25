@@ -18,6 +18,17 @@ func TestRenderList(t *testing.T) {
 	}
 }
 
+func TestFormatLineIcon(t *testing.T) {
+	e := Entry{ID: 5, Preview: "🖼 PNG · 1.0 KB", Mime: "image/png"}
+	if got, want := FormatLineIcon(e, "/c/5.png"), "5\t🖼 PNG · 1.0 KB\x00icon\x1f/c/5.png"; got != want {
+		t.Errorf("with icon: got %q want %q", got, want)
+	}
+	plain := Entry{ID: 6, Preview: "hello"}
+	if got, want := FormatLineIcon(plain, ""), "6\thello"; got != want {
+		t.Errorf("no icon: got %q want %q", got, want)
+	}
+}
+
 func TestParseID(t *testing.T) {
 	cases := map[string]uint64{
 		"5":             5,
