@@ -27,7 +27,12 @@ In the `copyzen-menu` fuzzel picker:
   it would override a default — against the standing "don't override a dependency's
   defaults" rule. `Control+Shift+c` (lowercase `c`; fuzzel never fires upper-case Shift
   combos) is free, additive, and keeps the "C = clear" mnemonic.
-- **Delete key: `Control+d`** — verified free in fuzzel 1.9.2 defaults.
+- **Delete key: `Control+Shift+d`.** (CORRECTION found in pre-deploy real-machine testing:
+  `Control+d` is NOT free — it is fuzzel's `delete-next` default, which the man page omits
+  and only `fuzzel`'s own config-parse error revealed. Binding it errored out and stopped
+  the picker from opening. `Control+Shift+d` is free, keeps the mnemonic, and overrides no
+  default — matching `Control+Shift+c` for clear. Exit code stays custom-2 → 11, so the
+  menu logic is unchanged; only the key and its on-screen label differ.)
 - **Delete confirm view: single item** (not full-list-with-marked-row). Unambiguous,
   symmetric with the clear view, and avoids fuzzel's inability to preselect/recolor a row.
 - **Clear confirm shows counts** (e.g. `Clear 37 history items · 4 pinned kept`).
@@ -53,7 +58,7 @@ All additive; none override a fuzzel default binding:
 ```ini
 [key-bindings]
 custom-1=Control+s         # toggle pin/unpin   -> exit 10 (existing)
-custom-2=Control+d         # delete (confirmed) -> exit 11
+custom-2=Control+Shift+d   # delete (confirmed) -> exit 11  (Control+d is fuzzel's delete-next default)
 custom-3=Control+Shift+c   # clear all history  -> exit 12
 ```
 

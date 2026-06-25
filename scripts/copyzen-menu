@@ -2,7 +2,7 @@
 # copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
 #   Enter          copy selection (type-aware: images paste back as images)
 #   Ctrl+S         pin/unpin (toggle) selection
-#   Ctrl+D         delete selection      (confirm: press Ctrl+D again, Esc cancels)
+#   Ctrl+Shift+D   delete selection      (confirm: press Ctrl+Shift+D again, Esc cancels)
 #   Ctrl+Shift+C   clear ALL history     (confirm: press Ctrl+Shift+C again, Esc cancels)
 #   Esc            quit
 # fuzzel exits on every action key and cannot reload its list, so each action
@@ -50,7 +50,7 @@ while :; do
 		# confirms; Enter/Esc/anything else cancels. Deletes the captured id.
 		preview=$(printf '%s' "$sel" | sed 's/^[0-9]*	//')
 		printf '%s\n' "$preview" | fuzzel "$@" \
-			--prompt '🗑 Delete this entry?  Ctrl+D = confirm · Esc = cancel ' >/dev/null
+			--prompt '🗑 Delete this entry?  Ctrl+Shift+D = confirm · Esc = cancel ' >/dev/null
 		[ "$?" -eq 11 ] && printf '%s' "$sel" | copyzen delete
 		state=list
 		;;
