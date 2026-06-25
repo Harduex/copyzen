@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"math/rand"
 	"path/filepath"
 	"testing"
 
@@ -202,5 +203,77 @@ func TestPinUnknownAndUnpinNotPinned(t *testing.T) {
 	}
 	if err := s.Unpin(1); err != ErrNotFound {
 		t.Errorf("unpin a non-pinned id: want ErrNotFound, got %v", err)
+	}
+}
+
+func pinnedSnapshot(t *testing.T, s *Store) map[uint64]string {
+	t.Helper()
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := map[uint64]string{}
+	for _, e := range entries {
+		if e.Pinned {
+			p, err := s.Get(e.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m[e.ID] = string(p)
+		}
+	}
+	return m
+}
+
+// Invariant: decode(store(x)) == x for arbitrary non-empty bytes.
+func TestProperty_RoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 1000; i++ {
+		payload := make([]byte, 1+rng.Intn(64))
+		rng.Read(payload)
+		if err := s.Add(payload, 100); err != nil {
+			t.Fatal(err)
+		}
+		entries, err := s.List()
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.Get(entries[0].ID) // newest (no pins in this test)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, payload) {
+			t.Fatalf("iter %d: round-trip mismatch", i)
+		}
+	}
+}
+
+// Invariant: Add (and thus eviction) never modifies the pinned bucket.
+func TestProperty_AddNeverTouchesPinned(t *testing.T) {
+	s := newTestStore(t)
+	rng := rand.New(rand.NewSource(2))
+	const capN = 5
+	for i := 0; i < 1000; i++ {
+		if rng.Intn(3) == 0 {
+			if entries, _ := s.List(); len(entries) > 0 {
+				_ = s.Pin(entries[rng.Intn(len(entries))].ID)
+			}
+		}
+		before := pinnedSnapshot(t, s)
+		payload := make([]byte, 1+rng.Intn(16))
+		rng.Read(payload)
+		if err := s.Add(payload, capN); err != nil {
+			t.Fatal(err)
+		}
+		after := pinnedSnapshot(t, s)
+		if len(before) != len(after) {
+			t.Fatalf("iter %d: Add changed pinned count %d -> %d", i, len(before), len(after))
+		}
+		for id, want := range before {
+			if after[id] != want {
+				t.Fatalf("iter %d: Add mutated pinned id %d", i, id)
+			}
+		}
 	}
 }
