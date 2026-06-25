@@ -173,57 +173,115 @@ func (s *Store) Get(id uint64) ([]byte, error) {
 }
 
 // List returns pinned entries (newest pin first) followed by history entries
-// (newest first). bbolt iterates ascending, so reverse iteration gives newest-first.
+// (newest first), hiding any history entry whose payload is already pinned so it is
+// not shown twice. bbolt iterates ascending, so reverse iteration gives newest-first.
 func (s *Store) List() ([]Entry, error) {
 	var entries []Entry
 	err := s.db.View(func(tx *bolt.Tx) error {
-		appendBucket := func(name string, pinned bool) {
-			c := tx.Bucket([]byte(name)).Cursor()
-			for k, v := c.Last(); k != nil; k, v = c.Prev() {
-				entries = append(entries, Entry{ID: btoi(k), Pinned: pinned, Preview: Preview(v)})
-			}
+		pinned := map[string]bool{}
+		pc := tx.Bucket([]byte(bucketPinned)).Cursor()
+		for k, v := pc.Last(); k != nil; k, v = pc.Prev() {
+			pinned[string(v)] = true
+			entries = append(entries, Entry{ID: btoi(k), Pinned: true, Preview: Preview(v)})
 		}
-		appendBucket(bucketPinned, true)
-		appendBucket(bucketHistory, false)
+		hc := tx.Bucket([]byte(bucketHistory)).Cursor()
+		for k, v := hc.Last(); k != nil; k, v = hc.Prev() {
+			if pinned[string(v)] {
+				continue
+			}
+			entries = append(entries, Entry{ID: btoi(k), Pinned: false, Preview: Preview(v)})
+		}
 		return nil
 	})
 	return entries, err
 }
 
+// pinTx copies the payload for id into the pinned bucket under a new id, or is a
+// no-op if an identical payload is already pinned. Runs in a writable transaction.
+func pinTx(tx *bolt.Tx, id uint64) error {
+	payload := lookup(tx, id)
+	if payload == nil {
+		return ErrNotFound
+	}
+	p := tx.Bucket([]byte(bucketPinned))
+	c := p.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if bytes.Equal(v, payload) {
+			return nil
+		}
+	}
+	newID, err := nextID(tx)
+	if err != nil {
+		return err
+	}
+	return p.Put(itob(newID), payload)
+}
+
 // Pin copies the payload identified by id into the pinned bucket under a new id.
-// It is a no-op when an identical payload is already pinned, so re-pinning never
-// duplicates. The history copy is left untouched.
+// It is a no-op when an identical payload is already pinned. The history copy is
+// left untouched.
 func (s *Store) Pin(id uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		payload := lookup(tx, id)
-		if payload == nil {
-			return ErrNotFound
+	return s.db.Update(func(tx *bolt.Tx) error { return pinTx(tx, id) })
+}
+
+// promoteToHistory drops any existing history copies of payload, inserts it as the
+// newest history entry, and evicts beyond cap. Used when unpinning so the entry
+// returns to the top of history as if freshly copied (and never duplicated).
+func promoteToHistory(tx *bolt.Tx, payload []byte, capN int) error {
+	h := tx.Bucket([]byte(bucketHistory))
+	var dups [][]byte
+	c := h.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if bytes.Equal(v, payload) {
+			dups = append(dups, append([]byte(nil), k...))
 		}
-		p := tx.Bucket([]byte(bucketPinned))
-		c := p.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if bytes.Equal(v, payload) {
-				return nil
-			}
-		}
-		newID, err := nextID(tx)
-		if err != nil {
+	}
+	for _, k := range dups {
+		if err := h.Delete(k); err != nil {
 			return err
 		}
-		return p.Put(itob(newID), payload)
+	}
+	id, err := nextID(tx)
+	if err != nil {
+		return err
+	}
+	if err := h.Put(itob(id), payload); err != nil {
+		return err
+	}
+	return evict(h, capN)
+}
+
+// unpinTx removes id from the pinned bucket and promotes its payload to the top of
+// history, so an unpinned entry returns to the active history as the newest item.
+func unpinTx(tx *bolt.Tx, id uint64, capN int) error {
+	p := tx.Bucket([]byte(bucketPinned))
+	key := itob(id)
+	v := p.Get(key)
+	if v == nil {
+		return ErrNotFound
+	}
+	payload := append([]byte(nil), v...)
+	if err := p.Delete(key); err != nil {
+		return err
+	}
+	return promoteToHistory(tx, payload, capN)
+}
+
+// Toggle pins id if it is not already pinned, otherwise unpins it (moving the entry
+// back to the top of history) — the picker's Ctrl+S action.
+func (s *Store) Toggle(id uint64, capN int) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		if tx.Bucket([]byte(bucketPinned)).Get(itob(id)) != nil {
+			return unpinTx(tx, id, capN)
+		}
+		return pinTx(tx, id)
 	})
 }
 
-// Unpin removes id from the pinned bucket.
-func (s *Store) Unpin(id uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		p := tx.Bucket([]byte(bucketPinned))
-		key := itob(id)
-		if p.Get(key) == nil {
-			return ErrNotFound
-		}
-		return p.Delete(key)
-	})
+// Unpin removes id from the pinned bucket and promotes its payload to the top of
+// history (as if freshly copied), so the entry returns to the active history.
+func (s *Store) Unpin(id uint64, capN int) error {
+	return s.db.Update(func(tx *bolt.Tx) error { return unpinTx(tx, id, capN) })
 }
 
 // Delete removes id from whichever bucket holds it (ids are unique across buckets).

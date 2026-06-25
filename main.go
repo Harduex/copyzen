@@ -16,7 +16,7 @@ var version = "dev"
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: copyzen {store|list|decode|delete|pin|unpin|wipe|version}")
+		return fmt.Errorf("usage: copyzen {store|list|decode|delete|pin|unpin|toggle|wipe|version}")
 	}
 	cmd := args[0]
 	if cmd == "version" {
@@ -76,7 +76,13 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		return s.Unpin(id)
+		return s.Unpin(id, capFromEnv())
+	case "toggle":
+		id, err := readID(stdin)
+		if err != nil {
+			return err
+		}
+		return s.Toggle(id, capFromEnv())
 	case "wipe":
 		return s.Wipe()
 	default:

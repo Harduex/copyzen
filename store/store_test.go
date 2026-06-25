@@ -170,8 +170,9 @@ func TestPinUnpin(t *testing.T) {
 		t.Fatal(err)
 	}
 	entries, _ := s.List()
-	if len(entries) != 2 || !entries[0].Pinned || entries[0].Preview != "keep me" {
-		t.Fatalf("pinned copy should be first: %+v", entries)
+	// The history copy is hidden once pinned; only the ★ row shows.
+	if len(entries) != 1 || !entries[0].Pinned || entries[0].Preview != "keep me" {
+		t.Fatalf("expected only the pinned row: %+v", entries)
 	}
 	pinnedID := entries[0].ID
 	got, _ := s.Get(pinnedID)
@@ -183,11 +184,12 @@ func TestPinUnpin(t *testing.T) {
 	if err := s.Pin(1); err != nil {
 		t.Fatal(err)
 	}
-	if entries, _ := s.List(); len(entries) != 2 {
+	if entries, _ := s.List(); len(entries) != 1 {
 		t.Errorf("re-pin duplicated: %d entries", len(entries))
 	}
 
-	if err := s.Unpin(pinnedID); err != nil {
+	// After unpin the history copy reappears (unpinned).
+	if err := s.Unpin(pinnedID, 100); err != nil {
 		t.Fatal(err)
 	}
 	if entries, _ := s.List(); len(entries) != 1 || entries[0].Pinned {
@@ -201,7 +203,7 @@ func TestPinUnknownAndUnpinNotPinned(t *testing.T) {
 	if err := s.Pin(999); err != ErrNotFound {
 		t.Errorf("pin unknown: want ErrNotFound, got %v", err)
 	}
-	if err := s.Unpin(1); err != ErrNotFound {
+	if err := s.Unpin(1, 100); err != ErrNotFound {
 		t.Errorf("unpin a non-pinned id: want ErrNotFound, got %v", err)
 	}
 }
@@ -346,15 +348,86 @@ func TestAddDedupScopeIsHistoryOnly(t *testing.T) {
 	}
 	// History is now empty; "x" exists only as a pin. Re-adding "x" must store it —
 	// dedup compares against the most-recent history entry, never the pinned bucket.
+	// (List would hide it since it matches the pin, so assert against the bucket.)
 	_ = s.Add([]byte("x"), 100)
-	entries, _ := s.List()
-	hist := 0
-	for _, e := range entries {
-		if !e.Pinned {
-			hist++
+	n := 0
+	_ = s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket([]byte(bucketHistory)).Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			n++
 		}
+		return nil
+	})
+	if n != 1 {
+		t.Fatalf("re-adding a pin-only payload must store it in history; history has %d", n)
 	}
-	if hist != 1 {
-		t.Fatalf("re-adding a payload that exists only as a pin must store it; got %d history entries", hist)
+}
+
+func TestListHidesPinnedDuplicateFromHistory(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("alpha"), 100) // id 1
+	_ = s.Add([]byte("beta"), 100)  // id 2
+	_ = s.Pin(2)                    // pin beta → id 3
+
+	entries, _ := s.List()
+	if len(entries) != 2 {
+		t.Fatalf("want ★beta + history alpha (beta hidden from history), got %d: %+v", len(entries), entries)
+	}
+	if !entries[0].Pinned || entries[0].Preview != "beta" {
+		t.Errorf("row 0 should be pinned beta: %+v", entries[0])
+	}
+	if entries[1].Pinned || entries[1].Preview != "alpha" {
+		t.Errorf("row 1 should be history alpha: %+v", entries[1])
+	}
+}
+
+func TestToggle(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("a"), 100) // id 1 (history)
+
+	// toggle a history id → pins it
+	if err := s.Toggle(1, 100); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := s.List()
+	if len(entries) != 1 || !entries[0].Pinned {
+		t.Fatalf("toggle should pin: %+v", entries)
+	}
+	pid := entries[0].ID
+
+	// toggle the pinned id → unpins it (entry returns to history)
+	if err := s.Toggle(pid, 100); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ = s.List()
+	if len(entries) != 1 || entries[0].Pinned {
+		t.Fatalf("toggle again should unpin: %+v", entries)
+	}
+
+	if err := s.Toggle(999, 100); err != ErrNotFound {
+		t.Errorf("toggle unknown id: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestUnpinMovesToTopOfHistory(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("old"), 100)   // id 1
+	_ = s.Pin(1)                    // pin "old" → id 2; history copy hidden
+	_ = s.Add([]byte("newer"), 100) // id 3
+
+	pinnedID := uint64(2)
+	if err := s.Unpin(pinnedID, 100); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := s.List()
+	// "old" returns to the TOP of history (newest), above "newer", and only once.
+	if len(entries) != 2 {
+		t.Fatalf("want 2 history rows, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].Pinned || entries[0].Preview != "old" {
+		t.Errorf("unpinned 'old' should be newest in history: %+v", entries)
+	}
+	if entries[1].Preview != "newer" {
+		t.Errorf("row 1 should be 'newer': %+v", entries[1])
 	}
 }
