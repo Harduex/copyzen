@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -91,4 +93,81 @@ func Thumbnail(src []byte, maxPx int) ([]byte, error) {
 		return nil, err
 	}
 	return out.Bytes(), nil
+}
+
+// ThumbDir is $XDG_CACHE_HOME/copyzen/thumbs, falling back to ~/.cache.
+func ThumbDir() (string, error) {
+	dir := os.Getenv("XDG_CACHE_HOME")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		dir = filepath.Join(home, ".cache")
+	}
+	return filepath.Join(dir, "copyzen", "thumbs"), nil
+}
+
+// ThumbPath is the cache file for id's thumbnail.
+func ThumbPath(id uint64) (string, error) {
+	dir, err := ThumbDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, strconv.FormatUint(id, 10)+".png"), nil
+}
+
+// EnsureThumb returns the cached thumbnail path for id, generating it if absent. src is
+// invoked only on a cache miss, so callers avoid loading payload bytes for cache hits.
+func EnsureThumb(id uint64, maxPx int, src func() ([]byte, error)) (string, error) {
+	path, err := ThumbPath(id)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+	data, err := src()
+	if err != nil {
+		return "", err
+	}
+	thumb, err := Thumbnail(data, maxPx)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, thumb, 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// PruneThumbs removes cached thumbnails whose id is not in keep. Best-effort: a missing
+// cache dir is not an error, and per-file removal errors are ignored.
+func PruneThumbs(keep map[uint64]bool) error {
+	dir, err := ThumbDir()
+	if err != nil {
+		return err
+	}
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, e := range ents {
+		name := e.Name()
+		if !strings.HasSuffix(name, ".png") {
+			continue
+		}
+		id, perr := strconv.ParseUint(strings.TrimSuffix(name, ".png"), 10, 64)
+		if perr != nil || keep[id] {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, name))
+	}
+	return nil
 }

@@ -6,6 +6,9 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"os"
+	"path/filepath"
+	"strconv"
 	"testing"
 
 	"golang.org/x/image/bmp"
@@ -106,6 +109,59 @@ func TestImageLabel(t *testing.T) {
 	for _, c := range cases {
 		if got := ImageLabel(c.mime, c.n); got != c.want {
 			t.Errorf("ImageLabel(%q,%d) = %q, want %q", c.mime, c.n, got, c.want)
+		}
+	}
+}
+
+func TestEnsureThumbLazyAndCached(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	calls := 0
+	src := func() ([]byte, error) { calls++; return encPNG(t, 40, 40), nil }
+
+	p1, err := EnsureThumb(7, 128, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p1); err != nil {
+		t.Fatalf("thumb not written: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("src calls: got %d want 1", calls)
+	}
+	// second call is a cache hit: src must NOT be called again
+	p2, err := EnsureThumb(7, 128, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p2 != p1 {
+		t.Errorf("path differs: %q vs %q", p1, p2)
+	}
+	if calls != 1 {
+		t.Errorf("cache miss on second call: src called %d times", calls)
+	}
+}
+
+func TestPruneThumbs(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", dir)
+	td := filepath.Join(dir, "copyzen", "thumbs")
+	if err := os.MkdirAll(td, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []uint64{1, 2, 3} {
+		if err := os.WriteFile(filepath.Join(td, strconv.FormatUint(id, 10)+".png"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := PruneThumbs(map[uint64]bool{1: true, 3: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(td, "2.png")); !os.IsNotExist(err) {
+		t.Error("orphan 2.png should be removed")
+	}
+	for _, id := range []string{"1.png", "3.png"} {
+		if _, err := os.Stat(filepath.Join(td, id)); err != nil {
+			t.Errorf("%s should remain: %v", id, err)
 		}
 	}
 }
