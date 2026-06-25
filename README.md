@@ -1,0 +1,133 @@
+# copyzen
+
+A minimalist Wayland clipboard-history manager with pinning, for Pop!_OS COSMIC and any
+Wayland compositor with `wl-clipboard`.
+
+copyzen is a **store, not a clipboard client**. It never speaks the Wayland protocol — it
+delegates every clipboard operation to `wl-clipboard` and uses fuzzel as the entire UI.
+Its guiding value, borrowed from [cliphist](https://github.com/sentriz/cliphist), is
+*"no concept of a picker, only pipes."*
+
+## Architecture
+
+```
+« wl-clipboard + fuzzel — external »                             « copyzen »                                             « store »
+┌───────────────────────────────────┐                            ┌───────────────────────────┐                           ┌───────────────────┐
+│ wl-paste --watch  [records]       │─ feeds selection [stdin] ─▶│ copyzen  [Go]             │─ history + pins [bbolt] ─▶│ store.db  [bbolt] │
+│  fuzzel | wl-copy  [pick + paste] │◀── picker + paste [dmenu] ─│  copyzen-menu  [POSIX sh] │                           │                   │
+└───────────────────────────────────┘                            └───────────────────────────┘                           └───────────────────┘
+```
+
+Recording flows left→right; picking and pasting flow right→left across the same boundaries.
+No daemon of our own, no Wayland-protocol code, no second datastore — `wl-paste --watch`
+feeds bytes in, `wl-copy` sends the chosen bytes back, and the only persistent process is
+that `wl-paste` watcher.
+
+## Install
+
+One-liner (pinned to a release tag — replace `v0.1.0` with the latest):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Harduex/copyzen/v0.1.0/install.sh | sh
+```
+
+It detects your arch, downloads the prebuilt binary from this repo's Releases, **verifies
+its SHA-256** (aborting on mismatch), installs `copyzen` + `copyzen-menu` to
+`/usr/local/bin` (prompting for `sudo` only if needed), writes a scoped fuzzel config, sets
+up the background recorder, and prints the Super+V binding steps. It is idempotent.
+
+`copyzen` and `copyzen-menu` need [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard)
+and [`fuzzel`](https://codeberg.org/dnkl/fuzzel) installed; the installer checks for them and
+tells you if either is missing (it won't guess your package manager).
+
+### Manual (download, read, run)
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/Harduex/copyzen/v0.1.0/install.sh
+less install.sh        # read before running
+sh install.sh
+```
+
+Pin a specific build with `COPYZEN_VERSION=v0.1.0 sh install.sh`.
+
+### From source
+
+```sh
+git clone https://github.com/Harduex/copyzen && cd copyzen
+CGO_ENABLED=0 go build -o copyzen .
+sudo install -m 0755 copyzen scripts/copyzen-menu /usr/local/bin/
+mkdir -p ~/.config/copyzen ~/.config/autostart
+cp dist/fuzzel.ini ~/.config/copyzen/fuzzel.ini
+cp dist/copyzen.desktop ~/.config/autostart/copyzen.desktop   # background recorder
+```
+
+## Bind Super+V (COSMIC)
+
+Settings → Desktop → Keyboard → Custom Shortcuts → **Add Shortcut**:
+
+- **Command:** `copyzen-menu`
+- **Shortcut:** `Super+V`
+
+Press Super+V to open the picker. **Enter** copies the highlighted entry back to the
+clipboard; **Esc** dismisses.
+
+## Pinning
+
+Pins survive history rollover. In the picker, highlight an entry and press **Ctrl+P** — it
+is copied into a separate `pinned` store and shown with a `★` at the top of the list. The
+rolling history can fill up and evict old entries; pins are never touched.
+
+Unpin from a terminal (pins are managed by id):
+
+```sh
+copyzen list            # find the ★ entry's id (first column)
+echo <id> | copyzen unpin
+```
+
+## Commands
+
+`copyzen` reads stdin and writes stdout; it is meant to be piped. `decode`/`delete`/`pin`/
+`unpin` accept either a bare id or a full `id<TAB>preview` line (so the picker's raw output
+pipes straight in).
+
+| Command | stdin | Effect / output |
+|---|---|---|
+| `copyzen store` | raw bytes | store into history (skips empty, dedups vs most-recent, evicts beyond cap) |
+| `copyzen list` | — | `id<TAB>preview` lines — pinned (`★`) first, then history, newest-first |
+| `copyzen decode` | id / line | write the original payload to stdout, **byte-for-byte** |
+| `copyzen delete` | id / line | remove the entry from whichever store holds it |
+| `copyzen pin` | id / line | copy the entry into the pinned store |
+| `copyzen unpin` | id / line | remove the entry from the pinned store |
+| `copyzen wipe` | — | clear history only (pins kept) |
+| `copyzen version` | — | print the version |
+
+Recording is just `wl-paste --watch --no-newline copyzen store`; pasting back is
+`copyzen decode | wl-copy`. `--no-newline` is required — without it `wl-paste` appends a
+trailing newline and breaks the byte-for-byte guarantee.
+
+## Configuration
+
+- `COPYZEN_MAX_HISTORY` — history cap (default `100`; non-positive/invalid values fall back
+  to the default). Pinned entries are never capped.
+- Database: `$XDG_DATA_HOME/copyzen/store.db` (default `~/.local/share/copyzen/store.db`).
+
+The recorder runs via the XDG autostart entry. To use systemd instead:
+
+```sh
+systemctl --user enable --now copyzen.service
+rm ~/.config/autostart/copyzen.desktop   # so you don't run two recorders
+```
+
+## Uninstall
+
+```sh
+pkill -f 'wl-paste --watch.*copyzen store'
+sudo rm /usr/local/bin/copyzen /usr/local/bin/copyzen-menu
+rm -rf ~/.config/copyzen ~/.config/autostart/copyzen.desktop \
+       ~/.config/systemd/user/copyzen.service
+rm -rf ~/.local/share/copyzen   # deletes history AND pins
+```
+
+## License
+
+[MIT](LICENSE)
