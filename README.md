@@ -156,6 +156,10 @@ rm -rf ~/.config/copyzen ~/.config/autostart/copyzen.desktop \
 rm -rf ~/.local/share/copyzen   # deletes history AND pins
 ```
 
+## Releasing
+
+Maintainers: a release is a `v*` git tag — see [docs/RELEASING.md](docs/RELEASING.md).
+
 ## License
 
 [MIT](LICENSE)
