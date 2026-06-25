@@ -124,8 +124,36 @@ func (s *Store) Add(payload []byte, capN int) error {
 		if err != nil {
 			return err
 		}
-		return h.Put(itob(id), payload)
+		if err := h.Put(itob(id), payload); err != nil {
+			return err
+		}
+		return evict(h, capN)
 	})
+}
+
+// evict deletes the oldest history entries while the count exceeds capN. It only
+// ever touches the history bucket — that is why pinned entries can never be evicted.
+// The count comes from cursor traversal, not Stats().KeyN: Stats reflects only
+// committed state and excludes the key just Put in this same transaction.
+func evict(h *bolt.Bucket, capN int) error {
+	if capN <= 0 {
+		capN = DefaultCap
+	}
+	c := h.Cursor()
+	count := 0
+	for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		count++
+	}
+	for count > capN {
+		if k, _ := c.First(); k == nil {
+			break
+		}
+		if err := c.Delete(); err != nil {
+			return err
+		}
+		count--
+	}
+	return nil
 }
 
 // Get returns the exact payload for id, searching history then pinned.

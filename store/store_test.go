@@ -118,3 +118,23 @@ func TestGetUnknown(t *testing.T) {
 		t.Errorf("want ErrNotFound, got %v", err)
 	}
 }
+
+func TestEvictionRespectsCap(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i < 5; i++ {
+		if err := s.Add([]byte{byte('a' + i)}, 3); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// cap 3 → ids 1,2 evicted; 3,4,5 remain.
+	for _, gone := range []uint64{1, 2} {
+		if _, err := s.Get(gone); err != ErrNotFound {
+			t.Errorf("id %d should be evicted", gone)
+		}
+	}
+	for _, kept := range []uint64{3, 4, 5} {
+		if _, err := s.Get(kept); err != nil {
+			t.Errorf("id %d should remain: %v", kept, err)
+		}
+	}
+}
