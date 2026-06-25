@@ -1,0 +1,36 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Build static binaries
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+        run: |
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+              -o "copyzen-linux-$arch" .
+          done
+      - name: Generate checksums
+        run: sha256sum copyzen-linux-amd64 copyzen-linux-arm64 > sha256sums.txt
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            copyzen-linux-amd64 copyzen-linux-arm64 sha256sums.txt \
+            scripts/copyzen-menu dist/fuzzel.ini dist/copyzen.service dist/copyzen.desktop
