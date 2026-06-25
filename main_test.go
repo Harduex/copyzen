@@ -102,3 +102,25 @@ func TestRunListEmitsIcon(t *testing.T) {
 		t.Error("text row should not carry an icon")
 	}
 }
+
+func TestRunListMarkActive(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	if err := run([]string{"store"}, strings.NewReader("alpha"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"store"}, strings.NewReader("beta"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"list", "--mark-active"}, strings.NewReader("alpha"), &out); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	// newest-first: beta (id 2) then alpha (id 1); alpha is the clipboard
+	if strings.Contains(lines[0], "●") {
+		t.Errorf("beta (not clipboard) should have no dot: %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "●") {
+		t.Errorf("alpha (clipboard) should carry the dot: %q", lines[1])
+	}
+}

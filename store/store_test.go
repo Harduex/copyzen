@@ -457,3 +457,22 @@ func TestListMarksImages(t *testing.T) {
 		t.Errorf("image entry preview: got %q", entries[1].Preview)
 	}
 }
+
+func TestActive(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("alpha"), 100) // id 1
+	_ = s.Add([]byte("beta"), 100)  // id 2
+	if id, _ := s.Active([]byte("beta")); id != 2 {
+		t.Errorf("active beta: got %d want 2", id)
+	}
+	if id, _ := s.Active([]byte("nope")); id != 0 {
+		t.Errorf("no match: got %d want 0", id)
+	}
+	if id, _ := s.Active(nil); id != 0 {
+		t.Errorf("empty clip: got %d want 0", id)
+	}
+	_ = s.Pin(1) // pinned copy of "alpha" -> id 3
+	if id, _ := s.Active([]byte("alpha")); id != 3 {
+		t.Errorf("active alpha should resolve to the pin (id 3): got %d", id)
+	}
+}

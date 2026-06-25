@@ -43,6 +43,20 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 		return s.Add(data, capFromEnv())
 	case "list":
+		// With --mark-active, stdin carries the current clipboard; the matching entry is
+		// flagged with ● so the live item is identifiable wherever the highlight moves.
+		var activeID uint64
+		for _, a := range args[1:] {
+			if a == "--mark-active" {
+				clip, err := io.ReadAll(stdin)
+				if err != nil {
+					return err
+				}
+				if activeID, err = s.Active(clip); err != nil {
+					return err
+				}
+			}
+		}
 		entries, err := s.List()
 		if err != nil {
 			return err
@@ -51,6 +65,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		var b strings.Builder
 		for _, e := range entries {
 			keep[e.ID] = true
+			e.Active = e.ID == activeID
 			icon := ""
 			if e.Mime != "" {
 				id := e.ID

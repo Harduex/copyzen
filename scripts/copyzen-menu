@@ -28,7 +28,8 @@ sel=
 while :; do
 	case "$state" in
 	list)
-		sel=$(copyzen list | fuzzel "$@" $withnth)
+		# Pipe the current clipboard in so copyzen can mark the live entry (●).
+		sel=$(wl-paste --no-newline 2>/dev/null | copyzen list --mark-active | fuzzel "$@" $withnth)
 		case "$?" in
 		0)  if [ -n "$sel" ]; then
 				t=$(printf '%s' "$sel" | copyzen mimetype)

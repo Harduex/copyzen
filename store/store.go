@@ -35,6 +35,31 @@ type Entry struct {
 	Pinned  bool
 	Preview string
 	Mime    string // image MIME (e.g. "image/png"); empty for non-images
+	Active  bool   // payload equals the current clipboard (the live entry)
+}
+
+// Active returns the id of the entry whose payload byte-for-byte equals clip (the current
+// clipboard), or 0 if none matches. Pinned is checked before history so a clipboard that
+// matches a pinned payload resolves to the pin (the row actually shown). clip of length 0
+// never matches (avoids marking on an empty/unavailable clipboard).
+func (s *Store) Active(clip []byte) (uint64, error) {
+	if len(clip) == 0 {
+		return 0, nil
+	}
+	var id uint64
+	err := s.db.View(func(tx *bolt.Tx) error {
+		for _, name := range []string{bucketPinned, bucketHistory} {
+			c := tx.Bucket([]byte(name)).Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				if bytes.Equal(v, clip) {
+					id = btoi(k)
+					return nil
+				}
+			}
+		}
+		return nil
+	})
+	return id, err
 }
 
 // DefaultPath is $XDG_DATA_HOME/copyzen/store.db, falling back to ~/.local/share.

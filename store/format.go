@@ -6,13 +6,18 @@ import (
 	"strings"
 )
 
-// FormatLine renders one list row as "id<TAB>preview"; pinned rows prefix the
-// preview field with a star so it shows under fuzzel --with-nth 2.
+// FormatLine renders one list row as "id<TAB>preview". A pinned row prefixes the preview
+// with a star (★), and the live-clipboard row with a dot (●), in that order — so a pinned
+// row always starts with ★ (the clear-confirm pin count relies on a leading ★).
 func FormatLine(e Entry) string {
+	prefix := ""
 	if e.Pinned {
-		return strconv.FormatUint(e.ID, 10) + "\t★ " + e.Preview
+		prefix += "★ "
 	}
-	return strconv.FormatUint(e.ID, 10) + "\t" + e.Preview
+	if e.Active {
+		prefix += "● "
+	}
+	return strconv.FormatUint(e.ID, 10) + "\t" + prefix + e.Preview
 }
 
 // FormatLineIcon renders a list row, appending Rofi's extended dmenu icon marker
