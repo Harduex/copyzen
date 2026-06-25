@@ -5,7 +5,8 @@ After=graphical-session.target
 
 [Service]
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/env wl-paste --watch --no-newline copyzen store
+# wl-paste options MUST precede --watch (everything after --watch is the command).
+ExecStart=/usr/bin/env wl-paste --no-newline --watch copyzen store
 Restart=on-failure
 
 [Install]

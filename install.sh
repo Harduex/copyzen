@@ -98,10 +98,11 @@ if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--wit
 	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+S pinning still works; update fuzzel to hide it."
 fi
 
-if pgrep -f 'wl-paste --watch.*copyzen store$' >/dev/null 2>&1; then
+# wl-paste options MUST precede --watch — everything after --watch is the command to run.
+if pgrep -f 'wl-paste.*--watch.*copyzen store$' >/dev/null 2>&1; then
 	say "Recorder already running."
 elif command -v wl-paste >/dev/null 2>&1; then
-	setsid wl-paste --watch --no-newline copyzen store >/dev/null 2>&1 &
+	setsid wl-paste --no-newline --watch copyzen store >/dev/null 2>&1 &
 	say "Started the clipboard recorder."
 fi
 

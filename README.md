@@ -108,9 +108,9 @@ pipes straight in).
 | `copyzen wipe` | — | clear history only (pins kept) |
 | `copyzen version` | — | print the version |
 
-Recording is just `wl-paste --watch --no-newline copyzen store`; pasting back is
-`copyzen decode | wl-copy`. `--no-newline` is required — without it `wl-paste` appends a
-trailing newline and breaks the byte-for-byte guarantee.
+Recording is `wl-paste --no-newline --watch copyzen store` — wl-paste options must come
+**before** `--watch` (everything after `--watch` is the command it runs). Pasting back is
+`copyzen decode | wl-copy`. Both round-trip the clipboard byte-for-byte.
 
 ## Configuration
 
@@ -128,7 +128,7 @@ rm ~/.config/autostart/copyzen.desktop   # so you don't run two recorders
 ## Uninstall
 
 ```sh
-pkill -f 'wl-paste --watch.*copyzen store$'
+pkill -f 'wl-paste.*--watch.*copyzen store$'
 sudo rm /usr/local/bin/copyzen /usr/local/bin/copyzen-menu
 rm -rf ~/.config/copyzen ~/.config/autostart/copyzen.desktop \
        ~/.config/systemd/user/copyzen.service

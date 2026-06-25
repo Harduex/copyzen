@@ -2,7 +2,7 @@
 Type=Application
 Name=copyzen clipboard recorder
 Comment=Records clipboard history for copyzen
-Exec=wl-paste --watch --no-newline copyzen store
+Exec=wl-paste --no-newline --watch copyzen store
 Terminal=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
