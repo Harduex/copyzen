@@ -225,3 +225,28 @@ func (s *Store) Unpin(id uint64) error {
 		return p.Delete(key)
 	})
 }
+
+// Delete removes id from whichever bucket holds it (ids are unique across buckets).
+func (s *Store) Delete(id uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		key := itob(id)
+		for _, name := range []string{bucketHistory, bucketPinned} {
+			b := tx.Bucket([]byte(name))
+			if b.Get(key) != nil {
+				return b.Delete(key)
+			}
+		}
+		return ErrNotFound
+	})
+}
+
+// Wipe clears history only; pinned entries and the id counter are untouched.
+func (s *Store) Wipe() error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		if err := tx.DeleteBucket([]byte(bucketHistory)); err != nil {
+			return err
+		}
+		_, err := tx.CreateBucket([]byte(bucketHistory))
+		return err
+	})
+}

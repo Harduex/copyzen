@@ -277,3 +277,43 @@ func TestProperty_AddNeverTouchesPinned(t *testing.T) {
 		}
 	}
 }
+
+func TestDelete(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("a"), 100) // id 1
+	_ = s.Pin(1)                // pinned copy id 2
+	pinnedID := uint64(2)
+
+	if err := s.Delete(1); err != nil { // delete history copy
+		t.Fatal(err)
+	}
+	if _, err := s.Get(1); err != ErrNotFound {
+		t.Error("history id 1 should be gone")
+	}
+	if _, err := s.Get(pinnedID); err != nil {
+		t.Error("pinned copy must survive deleting the history entry")
+	}
+	if err := s.Delete(pinnedID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(pinnedID); err != ErrNotFound {
+		t.Error("pinned id should be gone")
+	}
+	if err := s.Delete(999); err != ErrNotFound {
+		t.Errorf("delete unknown: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestWipeKeepsPins(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("h1"), 100)
+	_ = s.Add([]byte("h2"), 100)
+	_ = s.Pin(2) // pin h2
+	if err := s.Wipe(); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := s.List()
+	if len(entries) != 1 || !entries[0].Pinned || entries[0].Preview != "h2" {
+		t.Fatalf("wipe should leave only the pin: %+v", entries)
+	}
+}
