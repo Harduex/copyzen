@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"path/filepath"
 	"testing"
 
@@ -47,5 +48,73 @@ func TestNextIDIncrementsAndPersists(t *testing.T) {
 	_ = s.db.Update(func(tx *bolt.Tx) error { b, _ = nextID(tx); return nil })
 	if a != 1 || b != 2 {
 		t.Fatalf("want 1,2 got %d,%d", a, b)
+	}
+}
+
+func TestAddGetRoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	payloads := [][]byte{
+		[]byte("plain"),
+		[]byte("trailing\n"),
+		[]byte("no-trailing"),
+		[]byte("  spaced  "),
+		[]byte("multi\nline\ntext"),
+		[]byte("crlf\r\nline"),
+		[]byte("héllo 世界 🚀"),
+		[]byte("tab\tand\nnewline"),
+	}
+	for _, p := range payloads {
+		if err := s.Add(p, 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, p := range payloads {
+		got, err := s.Get(uint64(i + 1))
+		if err != nil {
+			t.Fatalf("Get(%d): %v", i+1, err)
+		}
+		if !bytes.Equal(got, p) {
+			t.Errorf("round-trip mismatch: stored %q got %q", p, got)
+		}
+	}
+}
+
+func TestAddSkipsEmpty(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.Add(nil, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Add([]byte{}, 100); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(1); err != ErrNotFound {
+		t.Errorf("empty input should store nothing, got %v", err)
+	}
+}
+
+func TestAddDedupsConsecutive(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("x"), 100)
+	_ = s.Add([]byte("x"), 100) // deduped
+	_ = s.Add([]byte("y"), 100)
+	_ = s.Add([]byte("x"), 100) // non-consecutive: kept
+	if _, err := s.Get(1); err != nil {
+		t.Error("id 1 missing")
+	}
+	if _, err := s.Get(2); err != nil {
+		t.Error("id 2 missing")
+	}
+	if _, err := s.Get(3); err != nil {
+		t.Error("id 3 missing")
+	}
+	if _, err := s.Get(4); err != ErrNotFound {
+		t.Errorf("expected only 3 entries, got id 4: %v", err)
+	}
+}
+
+func TestGetUnknown(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Get(999); err != ErrNotFound {
+		t.Errorf("want ErrNotFound, got %v", err)
 	}
 }

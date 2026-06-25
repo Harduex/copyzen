@@ -2,6 +2,7 @@
 package store
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"os"
@@ -93,4 +94,52 @@ func nextID(tx *bolt.Tx) (uint64, error) {
 	}
 	cur++
 	return cur, m.Put([]byte("seq"), itob(cur))
+}
+
+// lookup returns a heap copy of the payload for id from history then pinned, or nil.
+// The copy keeps the bytes valid after the transaction and across same-transaction
+// writes that may remap the underlying mmap.
+func lookup(tx *bolt.Tx, id uint64) []byte {
+	key := itob(id)
+	for _, name := range []string{bucketHistory, bucketPinned} {
+		if v := tx.Bucket([]byte(name)).Get(key); v != nil {
+			return append([]byte(nil), v...)
+		}
+	}
+	return nil
+}
+
+// Add stores payload in history. Empty input is skipped; a payload identical to the
+// most-recent history entry is deduped.
+func (s *Store) Add(payload []byte, capN int) error {
+	if len(payload) == 0 {
+		return nil
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		h := tx.Bucket([]byte(bucketHistory))
+		if k, v := h.Cursor().Last(); k != nil && bytes.Equal(v, payload) {
+			return nil
+		}
+		id, err := nextID(tx)
+		if err != nil {
+			return err
+		}
+		return h.Put(itob(id), payload)
+	})
+}
+
+// Get returns the exact payload for id, searching history then pinned.
+func (s *Store) Get(id uint64) ([]byte, error) {
+	var out []byte
+	err := s.db.View(func(tx *bolt.Tx) error {
+		out = lookup(tx, id)
+		if out == nil {
+			return ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
