@@ -1,6 +1,7 @@
 # copyzen — image thumbnails + type-aware paste-back
 
-Design for **v0.3.0**. Make copied images first-class in the picker: render a small
+Design for **v0.2.0** (shipped together with the delete/clear feature; see
+`2026-06-25-copyzen-delete-clear-design.md`). Make copied images first-class in the picker: render a small
 thumbnail instead of garbage text, and paste them back as real images. Keeps copyzen's
 identity: single static `CGO_ENABLED=0` Go binary, no new *runtime* dependencies, store
 stays byte-faithful.

@@ -1,6 +1,7 @@
 # copyzen — delete (Ctrl+D) + clear-history (Ctrl+Shift+C) with minimalist confirmation
 
-Design for v0.2.0. Adds two destructive picker actions, each gated by a two-step
+Design for v0.2.0 (shipped together with image thumbnails; see
+`2026-06-25-copyzen-image-previews-design.md`). Adds two destructive picker actions, each gated by a two-step
 confirmation, while keeping copyzen's identity intact: single static Go binary +
 fuzzel, zero new runtime dependencies, works out of the box.
 
