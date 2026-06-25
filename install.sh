@@ -38,7 +38,7 @@ command -v install >/dev/null 2>&1 || die "missing required tool: install"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 say "Downloading $asset ($VERSION)…"
-for f in "$asset" sha256sums.txt copyzen-menu fuzzel.ini copyzen.service copyzen.desktop; do
+for f in "$asset" sha256sums.txt copyzen-menu copyzen-update fuzzel.ini copyzen.service copyzen.desktop; do
 	curl -fsSL "$BASE/$f" -o "$tmp/$f" || die "download failed: $BASE/$f"
 done
 
@@ -68,9 +68,10 @@ install_bin() { # src destname
 		die "$PREFIX not writable and sudo unavailable; run as root or set PREFIX."
 	fi
 }
-say "Installing copyzen and copyzen-menu to $PREFIX…"
+say "Installing copyzen, copyzen-menu, copyzen-update to $PREFIX…"
 install_bin "$tmp/$asset" copyzen
 install_bin "$tmp/copyzen-menu" copyzen-menu
+install_bin "$tmp/copyzen-update" copyzen-update
 
 cfg_dir="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen"
 mkdir -p "$cfg_dir"
@@ -81,16 +82,6 @@ else
 	say "Wrote $cfg_dir/fuzzel.ini"
 fi
 
-autostart_dir="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
-mkdir -p "$autostart_dir"
-install -m 0644 "$tmp/copyzen.desktop" "$autostart_dir/copyzen.desktop"
-say "Installed autostart entry: $autostart_dir/copyzen.desktop"
-
-unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-mkdir -p "$unit_dir"
-install -m 0644 "$tmp/copyzen.service" "$unit_dir/copyzen.service"
-say "Shipped systemd unit (alternative, not enabled): $unit_dir/copyzen.service"
-
 for dep in wl-paste wl-copy fuzzel; do
 	command -v "$dep" >/dev/null 2>&1 || warn "'$dep' not found — install it (wl-clipboard provides wl-paste/wl-copy; fuzzel is its own package)."
 done
@@ -98,12 +89,34 @@ if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--wit
 	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+S pinning still works; update fuzzel to hide it."
 fi
 
+# Recorder: start now + on every login. Prefer a systemd --user service (auto-restarts on
+# crash); fall back to an XDG autostart entry where a systemd --user instance isn't usable.
 # wl-paste options MUST precede --watch — everything after --watch is the command to run.
-if pgrep -f 'wl-paste.*--watch.*copyzen store$' >/dev/null 2>&1; then
-	say "Recorder already running."
-elif command -v wl-paste >/dev/null 2>&1; then
-	setsid wl-paste --no-newline --watch copyzen store >/dev/null 2>&1 &
-	say "Started the clipboard recorder."
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+autostart="$cfg/autostart/copyzen.desktop"
+recorder_done=0
+if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+	mkdir -p "$cfg/systemd/user"
+	install -m 0644 "$tmp/copyzen.service" "$cfg/systemd/user/copyzen.service"
+	systemctl --user daemon-reload
+	if systemctl --user enable --now copyzen.service >/dev/null 2>&1 &&
+		[ "$(systemctl --user is-active copyzen.service 2>/dev/null)" = active ]; then
+		rm -f "$autostart" # one mechanism only — drop autostart so it can't double the recorder
+		recorder_done=1
+		say "Recorder: systemd --user service enabled (starts on login, auto-restarts)."
+	else
+		systemctl --user disable copyzen.service >/dev/null 2>&1 || true
+		warn "systemd --user service didn't start; falling back to XDG autostart."
+	fi
+fi
+if [ "$recorder_done" = 0 ]; then
+	mkdir -p "$(dirname "$autostart")"
+	install -m 0644 "$tmp/copyzen.desktop" "$autostart"
+	say "Recorder: installed XDG autostart entry (starts on next login)."
+	if command -v wl-paste >/dev/null 2>&1 && ! pgrep -f 'wl-paste.*--watch.*copyzen store$' >/dev/null 2>&1; then
+		setsid wl-paste --no-newline --watch copyzen store >/dev/null 2>&1 &
+		say "Started the clipboard recorder for this session."
+	fi
 fi
 
 cat <<EOF
@@ -123,7 +136,9 @@ Pinning: open the picker (Super+V), highlight an entry, press Ctrl+S to pin/unpi
 Pinned entries show a ★ at the top, are hidden from history, and survive rollover.
 Toggle from a terminal too:  copyzen list   then   echo <id> | copyzen toggle
 
-Recorder runs via XDG autostart. To use systemd instead:
-  systemctl --user enable --now copyzen.service
-  rm $autostart_dir/copyzen.desktop   # so you don't run two recorders
+The recorder is running now and starts on every login. To stop it:
+  systemctl --user disable --now copyzen.service   # (systemd setup)
+  # or remove ~/.config/autostart/copyzen.desktop  # (autostart fallback)
+
+Update any time:  copyzen-update
 EOF

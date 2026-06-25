@@ -1,0 +1,8 @@
+#!/bin/sh
+# copyzen-update — fetch and install the latest copyzen release (re-runs the installer).
+# Honors the same env as install.sh: COPYZEN_BASE_URL, COPYZEN_VERSION, PREFIX.
+set -eu
+: "${COPYZEN_BASE_URL:=https://github.com/Harduex/copyzen/releases/latest/download}"
+export COPYZEN_BASE_URL
+echo "Updating copyzen from $COPYZEN_BASE_URL …"
+curl -fsSL "$COPYZEN_BASE_URL/install.sh" | sh

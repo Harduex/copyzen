@@ -33,4 +33,5 @@ jobs:
             --title "${GITHUB_REF_NAME}" \
             --generate-notes \
             copyzen-linux-amd64 copyzen-linux-arm64 sha256sums.txt \
-            scripts/copyzen-menu dist/fuzzel.ini dist/copyzen.service dist/copyzen.desktop
+            install.sh scripts/copyzen-menu scripts/copyzen-update \
+            dist/fuzzel.ini dist/copyzen.service dist/copyzen.desktop

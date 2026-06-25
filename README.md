@@ -55,7 +55,7 @@ Pin a specific build with `COPYZEN_VERSION=v0.1.0 sh install.sh`.
 ```sh
 git clone https://github.com/Harduex/copyzen && cd copyzen
 CGO_ENABLED=0 go build -o copyzen .
-sudo install -m 0755 copyzen scripts/copyzen-menu /usr/local/bin/
+sudo install -m 0755 copyzen scripts/copyzen-menu scripts/copyzen-update /usr/local/bin/
 mkdir -p ~/.config/copyzen ~/.config/autostart
 cp dist/fuzzel.ini ~/.config/copyzen/fuzzel.ini
 cp dist/copyzen.desktop ~/.config/autostart/copyzen.desktop   # background recorder
@@ -118,18 +118,31 @@ Recording is `wl-paste --no-newline --watch copyzen store` — wl-paste options 
   to the default). Pinned entries are never capped.
 - Database: `$XDG_DATA_HOME/copyzen/store.db` (default `~/.local/share/copyzen/store.db`).
 
-The recorder runs via the XDG autostart entry. To use systemd instead:
+The installer starts the recorder now **and on every login** — preferring a systemd user
+service (`copyzen.service`, which auto-restarts), and falling back to an XDG autostart entry
+where a systemd-user instance isn't available. Manage it:
 
 ```sh
-systemctl --user enable --now copyzen.service
-rm ~/.config/autostart/copyzen.desktop   # so you don't run two recorders
+systemctl --user status copyzen.service           # check it
+systemctl --user disable --now copyzen.service     # stop and don't start on login
+# autostart fallback instead: remove ~/.config/autostart/copyzen.desktop
 ```
+
+## Updating
+
+```sh
+copyzen-update    # downloads, verifies, and installs the latest release
+```
+
+`copyzen-update` just re-runs the installer (idempotent), so the equivalent is re-running
+the install one-liner. It honors `COPYZEN_VERSION` / `PREFIX` / `COPYZEN_BASE_URL`.
 
 ## Uninstall
 
 ```sh
+systemctl --user disable --now copyzen.service 2>/dev/null
 pkill -f 'wl-paste.*--watch.*copyzen store$'
-sudo rm /usr/local/bin/copyzen /usr/local/bin/copyzen-menu
+sudo rm -f /usr/local/bin/copyzen /usr/local/bin/copyzen-menu /usr/local/bin/copyzen-update
 rm -rf ~/.config/copyzen ~/.config/autostart/copyzen.desktop \
        ~/.config/systemd/user/copyzen.service
 rm -rf ~/.local/share/copyzen   # deletes history AND pins
