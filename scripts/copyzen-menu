@@ -2,7 +2,7 @@
 # copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
 #   Enter          copy selection (type-aware: images paste back as images)
 #   Ctrl+S         pin/unpin (toggle) selection
-#   Ctrl+Shift+D   delete selection      (confirm: press Enter, Esc cancels)
+#   Shift+Delete   delete selection      (confirm: press Enter, Esc cancels)
 #   Ctrl+Shift+C   clear ALL history     (confirm: press Enter, Esc cancels)
 #   Esc            quit
 # fuzzel exits on every action key and cannot reload its list, so each action
