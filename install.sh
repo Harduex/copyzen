@@ -54,24 +54,25 @@ want="$(awk -v a="$asset" '$2 == a || $2 == "*" a {print $1}' "$tmp/sha256sums.t
 [ -n "$want" ] || die "no checksum for $asset in sha256sums.txt."
 [ "$want" = "$have" ] || die "checksum mismatch for $asset (expected $want, got $have)."
 
-install_bin() { # src destname
-	if [ -w "$PREFIX" ]; then
-		install -m 0755 "$1" "$PREFIX/$2"
-	elif command -v sudo >/dev/null 2>&1 && [ -e /dev/tty ]; then
+# Decide once how to write to PREFIX: writable → direct; otherwise sudo, asked a SINGLE
+# time, with credentials cached up front so the three installs below don't each re-prompt.
+SUDO=""
+if [ ! -w "$PREFIX" ]; then
+	if command -v sudo >/dev/null 2>&1 && [ -e /dev/tty ]; then
 		printf 'Install to %s needs root. Use sudo? [y/N] ' "$PREFIX" >/dev/tty
 		read -r ans </dev/tty || ans=""
 		case "$ans" in
-			[yY]*) sudo install -m 0755 "$1" "$PREFIX/$2" ;;
+			[yY]*) SUDO="sudo"; sudo -v ;;
 			*) die "aborted; re-run with write access to $PREFIX." ;;
 		esac
 	else
 		die "$PREFIX not writable and sudo unavailable; run as root or set PREFIX."
 	fi
-}
+fi
 say "Installing copyzen, copyzen-menu, copyzen-update to $PREFIX…"
-install_bin "$tmp/$asset" copyzen
-install_bin "$tmp/copyzen-menu" copyzen-menu
-install_bin "$tmp/copyzen-update" copyzen-update
+$SUDO install -m 0755 "$tmp/$asset" "$PREFIX/copyzen"
+$SUDO install -m 0755 "$tmp/copyzen-menu" "$PREFIX/copyzen-menu"
+$SUDO install -m 0755 "$tmp/copyzen-update" "$PREFIX/copyzen-update"
 
 cfg_dir="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen"
 mkdir -p "$cfg_dir"
@@ -82,9 +83,31 @@ else
 	say "Wrote $cfg_dir/fuzzel.ini"
 fi
 
-for dep in wl-paste wl-copy fuzzel; do
-	command -v "$dep" >/dev/null 2>&1 || warn "'$dep' not found — install it (wl-clipboard provides wl-paste/wl-copy; fuzzel is its own package)."
-done
+# Runtime deps: wl-clipboard (wl-paste/wl-copy) is core; fuzzel is the picker UI. Offer to
+# install whatever is missing via the system package manager — opt-in, never silent.
+missing=""
+{ command -v wl-paste >/dev/null 2>&1 && command -v wl-copy >/dev/null 2>&1; } || missing="wl-clipboard"
+command -v fuzzel >/dev/null 2>&1 || missing="${missing:+$missing }fuzzel"
+if [ -n "$missing" ]; then
+	pminstall=""
+	if command -v apt-get >/dev/null 2>&1; then pminstall="apt-get install -y"
+	elif command -v dnf >/dev/null 2>&1; then pminstall="dnf install -y"
+	elif command -v pacman >/dev/null 2>&1; then pminstall="pacman -S --noconfirm"
+	elif command -v zypper >/dev/null 2>&1; then pminstall="zypper install -y"
+	fi
+	if [ -n "$pminstall" ]; then
+		[ "$(id -u)" -ne 0 ] && pminstall="sudo $pminstall"
+		warn "missing: $missing (wl-clipboard = core; fuzzel = the picker UI)."
+		ans=""
+		[ -e /dev/tty ] && { printf 'Install now with: %s %s ? [y/N] ' "$pminstall" "$missing" >/dev/tty; read -r ans </dev/tty || ans=""; }
+		case "$ans" in
+			[yY]*) $pminstall $missing || warn "install failed — run manually: $pminstall $missing" ;;
+			*) warn "skipped — install later with:  $pminstall $missing" ;;
+		esac
+	else
+		warn "missing: $missing — install via your package manager (packages: $missing)."
+	fi
+fi
 if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
 	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+S pinning still works; update fuzzel to hide it."
 fi
