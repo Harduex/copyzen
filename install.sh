@@ -1,13 +1,18 @@
 #!/bin/sh
 # copyzen installer — downloads the binary + assets from GitHub Releases, verifies
 # the checksum, installs to /usr/local/bin, and sets up the clipboard recorder.
-# Idempotent. Pin a version with COPYZEN_VERSION=vX.Y.Z; default installs latest.
+# Idempotent. Env overrides:
+#   COPYZEN_VERSION=vX.Y.Z   pin a release (default: latest)
+#   PREFIX=/path             install dir (default: /usr/local/bin)
+#   COPYZEN_BASE_URL=url      fetch assets from a custom base (mirror / offline / testing)
 set -eu
 
 REPO="Harduex/copyzen"
-PREFIX="/usr/local/bin"
+PREFIX="${PREFIX:-/usr/local/bin}"
 VERSION="${COPYZEN_VERSION:-latest}"
-if [ "$VERSION" = "latest" ]; then
+if [ -n "${COPYZEN_BASE_URL:-}" ]; then
+	BASE="$COPYZEN_BASE_URL"
+elif [ "$VERSION" = "latest" ]; then
 	BASE="https://github.com/$REPO/releases/latest/download"
 else
 	BASE="https://github.com/$REPO/releases/download/$VERSION"
