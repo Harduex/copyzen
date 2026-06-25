@@ -48,7 +48,6 @@ fi
 want="$(awk -v a="$asset" '$2 == a || $2 == "*" a {print $1}' "$tmp/sha256sums.txt")"
 [ -n "$want" ] || die "no checksum for $asset in sha256sums.txt."
 [ "$want" = "$have" ] || die "checksum mismatch for $asset (expected $want, got $have)."
-chmod +x "$tmp/$asset" "$tmp/copyzen-menu"
 
 install_bin() { # src destname
 	if [ -w "$PREFIX" ]; then
@@ -94,7 +93,7 @@ if command -v fuzzel >/dev/null 2>&1 && ! fuzzel --help 2>&1 | grep -q -- '--wit
 	warn "your fuzzel lacks --with-nth: the id column shows in the picker (cosmetic). Ctrl+P pinning still works; update fuzzel to hide it."
 fi
 
-if pgrep -f 'wl-paste --watch.*copyzen store' >/dev/null 2>&1; then
+if pgrep -f 'wl-paste --watch.*copyzen store$' >/dev/null 2>&1; then
 	say "Recorder already running."
 elif command -v wl-paste >/dev/null 2>&1; then
 	setsid wl-paste --watch --no-newline copyzen store >/dev/null 2>&1 &

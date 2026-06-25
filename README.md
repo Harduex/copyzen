@@ -121,7 +121,7 @@ rm ~/.config/autostart/copyzen.desktop   # so you don't run two recorders
 ## Uninstall
 
 ```sh
-pkill -f 'wl-paste --watch.*copyzen store'
+pkill -f 'wl-paste --watch.*copyzen store$'
 sudo rm /usr/local/bin/copyzen /usr/local/bin/copyzen-menu
 rm -rf ~/.config/copyzen ~/.config/autostart/copyzen.desktop \
        ~/.config/systemd/user/copyzen.service
