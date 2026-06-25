@@ -113,10 +113,9 @@ Bind Super+V in COSMIC:
     Command : copyzen-menu
     Shortcut: Super+V
 
-Pinning: open the picker (Super+V), highlight an entry, press Ctrl+S. Pinned
-entries show a ★ at the top and survive history rollover. Unpin from a terminal:
-  copyzen list          # find the ★ entry's id
-  echo <id> | copyzen unpin
+Pinning: open the picker (Super+V), highlight an entry, press Ctrl+S to pin/unpin.
+Pinned entries show a ★ at the top, are hidden from history, and survive rollover.
+Toggle from a terminal too:  copyzen list   then   echo <id> | copyzen toggle
 
 Recorder runs via XDG autostart. To use systemd instead:
   systemctl --user enable --now copyzen.service

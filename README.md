@@ -73,15 +73,21 @@ clipboard; **Esc** dismisses.
 
 ## Pinning
 
-Pins survive history rollover. In the picker, highlight an entry and press **Ctrl+S** — it
-is copied into a separate `pinned` store and shown with a `★` at the top of the list. The
-rolling history can fill up and evict old entries; pins are never touched.
+Pins survive history rollover and appear once, with a `★`, at the top of the list — a
+pinned entry is hidden from the history section, so it never shows up twice.
 
-Unpin from a terminal (pins are managed by id):
+In the picker, highlight an entry and press **Ctrl+S** to toggle it:
+
+- on a history entry → it's pinned (copied into a separate `pinned` store the rolling
+  history never evicts);
+- on a `★` entry → it's unpinned and returns to the **top** of history, as if just copied.
+
+`Ctrl+S` closes the picker (fuzzel exits on any action key, so there's no flash); reopen
+with Super+V to toggle another. You can also toggle from a terminal by id:
 
 ```sh
-copyzen list            # find the ★ entry's id (first column)
-echo <id> | copyzen unpin
+copyzen list                 # find the entry's id (first column)
+echo <id> | copyzen toggle   # or: copyzen pin / copyzen unpin
 ```
 
 ## Commands
@@ -97,7 +103,8 @@ pipes straight in).
 | `copyzen decode` | id / line | write the original payload to stdout, **byte-for-byte** |
 | `copyzen delete` | id / line | remove the entry from whichever store holds it |
 | `copyzen pin` | id / line | copy the entry into the pinned store |
-| `copyzen unpin` | id / line | remove the entry from the pinned store |
+| `copyzen unpin` | id / line | unpin, returning the entry to the top of history |
+| `copyzen toggle` | id / line | pin if unpinned, else unpin (the picker's Ctrl+S) |
 | `copyzen wipe` | — | clear history only (pins kept) |
 | `copyzen version` | — | print the version |
 
