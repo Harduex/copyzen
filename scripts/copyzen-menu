@@ -11,6 +11,34 @@
 # No `set -e`: fuzzel's non-zero exits are control flow, not errors.
 set -u
 
+# ── dependency check ─────────────────────────────────────────────────────────
+missing=""
+for cmd in fuzzel wl-paste wl-copy copyzen; do
+	command -v "$cmd" >/dev/null 2>&1 || missing="${missing:+$missing, }$cmd"
+done
+if [ -n "$missing" ]; then
+	echo "copyzen-menu: missing required tools: $missing" >&2
+	echo "" >&2
+	# Detect package manager and suggest an install command.
+	if command -v apt-get >/dev/null 2>&1; then
+		pkgs="$(echo "$missing" | sed 's/wl-paste/wl-clipboard/;s/wl-copy/wl-clipboard/' | tr ',' '\n' | sort -u | tr '\n' ' ')"
+		echo "  Install with:  sudo apt-get install $pkgs" >&2
+	elif command -v dnf >/dev/null 2>&1; then
+		pkgs="$(echo "$missing" | sed 's/wl-paste/wl-clipboard/;s/wl-copy/wl-clipboard/' | tr ',' '\n' | sort -u | tr '\n' ' ')"
+		echo "  Install with:  sudo dnf install $pkgs" >&2
+	elif command -v pacman >/dev/null 2>&1; then
+		pkgs="$(echo "$missing" | sed 's/wl-paste/wl-clipboard/;s/wl-copy/wl-clipboard/' | tr ',' '\n' | sort -u | tr '\n' ' ')"
+		echo "  Install with:  sudo pacman -S $pkgs" >&2
+	elif command -v zypper >/dev/null 2>&1; then
+		pkgs="$(echo "$missing" | sed 's/wl-paste/wl-clipboard/;s/wl-copy/wl-clipboard/' | tr ',' '\n' | sort -u | tr '\n' ' ')"
+		echo "  Install with:  sudo zypper install $pkgs" >&2
+	else
+		echo "  Install the missing tools via your package manager." >&2
+		echo "  (wl-paste and wl-copy are part of the 'wl-clipboard' package)" >&2
+	fi
+	exit 1
+fi
+
 config="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen/fuzzel.ini"
 
 # Base args for every fuzzel call. --with-nth (hides the id column) needs a newer
