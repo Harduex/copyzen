@@ -34,6 +34,7 @@ type Entry struct {
 	ID      uint64
 	Pinned  bool
 	Preview string
+	Mime    string // image MIME (e.g. "image/png"); empty for non-images
 }
 
 // DefaultPath is $XDG_DATA_HOME/copyzen/store.db, falling back to ~/.local/share.
@@ -172,6 +173,14 @@ func (s *Store) Get(id uint64) ([]byte, error) {
 	return out, nil
 }
 
+// entryFrom builds a display Entry, labelling image payloads instead of byte-stripping them.
+func entryFrom(id uint64, pinned bool, v []byte) Entry {
+	if mime, _, ok := SniffImage(v); ok {
+		return Entry{ID: id, Pinned: pinned, Preview: ImageLabel(mime, len(v)), Mime: mime}
+	}
+	return Entry{ID: id, Pinned: pinned, Preview: Preview(v)}
+}
+
 // List returns pinned entries (newest pin first) followed by history entries
 // (newest first), hiding any history entry whose payload is already pinned so it is
 // not shown twice. bbolt iterates ascending, so reverse iteration gives newest-first.
@@ -182,14 +191,14 @@ func (s *Store) List() ([]Entry, error) {
 		pc := tx.Bucket([]byte(bucketPinned)).Cursor()
 		for k, v := pc.Last(); k != nil; k, v = pc.Prev() {
 			pinned[string(v)] = true
-			entries = append(entries, Entry{ID: btoi(k), Pinned: true, Preview: Preview(v)})
+			entries = append(entries, entryFrom(btoi(k), true, v))
 		}
 		hc := tx.Bucket([]byte(bucketHistory)).Cursor()
 		for k, v := hc.Last(); k != nil; k, v = hc.Prev() {
 			if pinned[string(v)] {
 				continue
 			}
-			entries = append(entries, Entry{ID: btoi(k), Pinned: false, Preview: Preview(v)})
+			entries = append(entries, entryFrom(btoi(k), false, v))
 		}
 		return nil
 	})

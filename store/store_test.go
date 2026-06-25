@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/rand"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
@@ -429,5 +430,30 @@ func TestUnpinMovesToTopOfHistory(t *testing.T) {
 	}
 	if entries[1].Preview != "newer" {
 		t.Errorf("row 1 should be 'newer': %+v", entries[1])
+	}
+}
+
+func TestListMarksImages(t *testing.T) {
+	s := newTestStore(t)
+	png := []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3}
+	if err := s.Add(png, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Add([]byte("plain text"), 100); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// newest-first: text (id 2) then image (id 1)
+	if entries[0].Mime != "" || entries[0].Preview != "plain text" {
+		t.Errorf("text entry: got mime=%q preview=%q", entries[0].Mime, entries[0].Preview)
+	}
+	if entries[1].Mime != "image/png" {
+		t.Errorf("image entry mime: got %q want image/png", entries[1].Mime)
+	}
+	if !strings.HasPrefix(entries[1].Preview, "🖼 PNG") {
+		t.Errorf("image entry preview: got %q", entries[1].Preview)
 	}
 }
