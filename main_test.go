@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"image"
+	"image/png"
 	"io"
 	"strings"
 	"testing"
@@ -70,5 +72,33 @@ func TestRunMimetype(t *testing.T) {
 	}
 	if txt.String() != "" {
 		t.Errorf("text mimetype: got %q want empty", txt.String())
+	}
+}
+
+func TestRunListEmitsIcon(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 30, 30))); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"store"}, bytes.NewReader(pngBuf.Bytes()), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"store"}, strings.NewReader("plain text"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"list"}, nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "\x00icon\x1f") {
+		t.Errorf("list output missing icon marker: %q", s)
+	}
+	if strings.Contains(strings.SplitN(s, "\n", 2)[0], "\x00icon") {
+		// first (newest) row is the plain-text entry and must NOT carry an icon
+		t.Error("text row should not carry an icon")
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Harduex/copyzen/store"
 )
@@ -46,7 +47,22 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = io.WriteString(stdout, store.RenderList(entries))
+		keep := make(map[uint64]bool, len(entries))
+		var b strings.Builder
+		for _, e := range entries {
+			keep[e.ID] = true
+			icon := ""
+			if e.Mime != "" {
+				id := e.ID
+				if p, err := store.EnsureThumb(id, store.ThumbMax, func() ([]byte, error) { return s.Get(id) }); err == nil {
+					icon = p
+				}
+			}
+			b.WriteString(store.FormatLineIcon(e, icon))
+			b.WriteByte('\n')
+		}
+		_ = store.PruneThumbs(keep) // best-effort; never break listing on cache errors
+		_, err = io.WriteString(stdout, b.String())
 		return err
 	case "decode":
 		id, err := readID(stdin)
