@@ -82,8 +82,8 @@ In the picker, highlight an entry and press **Ctrl+S** to toggle it:
   history never evicts);
 - on a `★` entry → it's unpinned and returns to the **top** of history, as if just copied.
 
-`Ctrl+S` closes the picker (fuzzel exits on any action key, so there's no flash); reopen
-with Super+V to toggle another. You can also toggle from a terminal by id:
+After `Ctrl+S` the picker reopens so you see the change (the `★` jumps to the top); keep
+toggling or press Esc to close. You can also toggle from a terminal by id:
 
 ```sh
 copyzen list                 # find the entry's id (first column)

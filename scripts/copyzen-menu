@@ -1,9 +1,9 @@
 #!/bin/sh
 # copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
 # Enter = copy selection; Ctrl+S = pin/unpin (toggle) selection; Esc = quit.
-# Each action closes the picker — fuzzel exits on any action key, so we never
-# relaunch it and there is no flash. Reopen with Super+V to act again.
-# No `set -e`: fuzzel's non-zero exits (toggle=10, cancel=1) are control flow.
+# After a pin/unpin the list reopens to show the change — fuzzel exits on any action
+# key, so relaunching is the only way to refresh its list.
+# No `set -e`: fuzzel's non-zero exits (toggle=10, cancel=1) are control flow, not errors.
 set -u
 
 config="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen/fuzzel.ini"
@@ -14,9 +14,13 @@ if fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
 	set -- "$@" --with-nth=2
 fi
 
-sel=$(copyzen list | fuzzel "$@")
-code=$?
-case "$code" in
-	0)  [ -n "$sel" ] && printf '%s' "$sel" | copyzen decode | wl-copy ;;
-	10) [ -n "$sel" ] && printf '%s' "$sel" | copyzen toggle ;;
-esac
+while :; do
+	sel=$(copyzen list | fuzzel "$@")
+	code=$?
+	case "$code" in
+		0)  [ -n "$sel" ] && printf '%s' "$sel" | copyzen decode | wl-copy
+			exit 0 ;;
+		10) [ -n "$sel" ] && printf '%s' "$sel" | copyzen toggle ;;
+		*)  exit 0 ;;
+	esac
+done
