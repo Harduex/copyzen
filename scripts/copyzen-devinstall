@@ -1,0 +1,49 @@
+#!/bin/sh
+# copyzen-devinstall — install the current working-tree build over the system copy for
+# pre-deploy testing on the real machine, or restore the official release afterwards.
+#
+#   copyzen-devinstall install [version]   build + install binary, picker, config locally
+#   copyzen-devinstall restore             replace the dev build with the latest release
+#
+# The recorder runs `copyzen store` fresh per clipboard event, so a new dev binary is used
+# for captures immediately — no recorder restart needed. Env: PREFIX (default /usr/local/bin).
+set -eu
+
+cmd="${1:-install}"
+prefix="${PREFIX:-/usr/local/bin}"
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+
+# Install to PREFIX, using sudo only when PREFIX isn't writable by the current user.
+put() { # src destname mode
+	if [ -w "$prefix" ]; then install -m "$3" "$1" "$prefix/$2"; else sudo install -m "$3" "$1" "$prefix/$2"; fi
+}
+
+case "$cmd" in
+install)
+	ver="${2:-dev}"
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+	echo "Building copyzen ($ver) from $root …"
+	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$ver" -o "$tmp/copyzen" .
+	put "$tmp/copyzen" copyzen 0755
+	put scripts/copyzen-menu copyzen-menu 0755
+	# Force-copy the config: the released installer KEEPS an existing fuzzel.ini, so binding
+	# or theme changes under test would otherwise not take effect.
+	install -Dm0644 dist/fuzzel.ini "${XDG_CONFIG_HOME:-$HOME/.config}/copyzen/fuzzel.ini"
+	echo "Installed dev build to $prefix ($(${prefix}/copyzen version 2>/dev/null || echo '?'))."
+	echo "Open the picker (Super+V) and test. After it ships, run: copyzen-devinstall restore"
+	;;
+restore)
+	echo "Restoring the official release (overwriting the dev build) …"
+	if command -v copyzen-update >/dev/null 2>&1; then
+		copyzen-update
+	else
+		curl -fsSL https://github.com/Harduex/copyzen/releases/latest/download/install.sh | sh
+	fi
+	;;
+*)
+	echo "usage: copyzen-devinstall [install [version] | restore]" >&2
+	exit 1
+	;;
+esac
