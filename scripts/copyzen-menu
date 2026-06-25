@@ -2,8 +2,8 @@
 # copyzen-menu — fuzzel-based clipboard picker for copyzen. Bind to Super+V.
 #   Enter          copy selection (type-aware: images paste back as images)
 #   Ctrl+S         pin/unpin (toggle) selection
-#   Ctrl+Shift+D   delete selection      (confirm: press Ctrl+Shift+D again, Esc cancels)
-#   Ctrl+Shift+C   clear ALL history     (confirm: press Ctrl+Shift+C again, Esc cancels)
+#   Ctrl+Shift+D   delete selection      (confirm: press Enter, Esc cancels)
+#   Ctrl+Shift+C   clear ALL history     (confirm: press Enter, Esc cancels)
 #   Esc            quit
 # fuzzel exits on every action key and cannot reload its list, so each action
 # relaunches fuzzel; confirmations relaunch into a confirm-state view. Pinned items
@@ -46,22 +46,22 @@ while :; do
 		esac
 		;;
 	confirm-delete)
-		# Show only the targeted entry's preview (strip "id<TAB>"). Only Ctrl+D (11)
-		# confirms; Enter/Esc/anything else cancels. Deletes the captured id.
+		# Show only the targeted entry's preview (strip "id<TAB>"). Enter (exit 0)
+		# confirms; Esc/anything else cancels. Deletes the captured id.
 		preview=$(printf '%s' "$sel" | sed 's/^[0-9]*	//')
 		printf '%s\n' "$preview" | fuzzel "$@" \
-			--prompt '🗑 Delete this entry?  Ctrl+Shift+D = confirm · Esc = cancel ' >/dev/null
-		[ "$?" -eq 11 ] && printf '%s' "$sel" | copyzen delete
+			--prompt '🗑 Delete? Enter = confirm · Esc = cancel ' >/dev/null
+		[ "$?" -eq 0 ] && printf '%s' "$sel" | copyzen delete
 		state=list
 		;;
 	confirm-clear)
-		# Hide the list, show counts + a warning. Only Ctrl+Shift+C (12) confirms.
+		# Hide the list, show counts + a warning. Enter (exit 0) confirms; Esc cancels.
 		counts=$(copyzen list | tr -d '\0' | awk -F'	' '
 			{ total++; if ($2 ~ /^★/) pinned++ }
 			END { printf "%d history items · %d pinned kept", total - pinned, pinned }')
 		printf 'Clear %s\n' "$counts" | fuzzel "$@" \
-			--prompt '⚠ Clear ALL history?  Ctrl+Shift+C = confirm · Esc = cancel ' >/dev/null
-		[ "$?" -eq 12 ] && copyzen wipe
+			--prompt '⚠ Clear ALL history? Enter = confirm · Esc = cancel ' >/dev/null
+		[ "$?" -eq 0 ] && copyzen wipe
 		state=list
 		;;
 	esac

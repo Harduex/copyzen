@@ -74,8 +74,8 @@ In the picker:
 
 - **Enter** — copy the highlighted entry back to the clipboard. Images paste back as images.
 - **Ctrl+S** — pin / unpin the highlighted entry (pins survive history eviction and clear-all).
-- **Ctrl+Shift+D** — delete the highlighted entry. Confirm by pressing **Ctrl+Shift+D** again; **Esc** cancels.
-- **Ctrl+Shift+C** — clear ALL history (pinned entries are kept). Confirm with **Ctrl+Shift+C**; **Esc** cancels.
+- **Ctrl+Shift+D** — delete the highlighted entry. A confirm view appears; press **Enter** to confirm, **Esc** to cancel.
+- **Ctrl+Shift+C** — clear ALL history (pinned entries are kept). A confirm view appears; press **Enter** to confirm, **Esc** to cancel.
 - **Esc** — quit.
 
 Copied **images** (PNG/JPEG/GIF/WebP/BMP) show a thumbnail in the picker (cached under
