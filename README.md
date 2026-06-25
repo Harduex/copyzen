@@ -68,22 +68,28 @@ Settings → Desktop → Keyboard → Custom Shortcuts → **Add Shortcut**:
 - **Command:** `copyzen-menu`
 - **Shortcut:** `Super+V`
 
-Press Super+V to open the picker. **Enter** copies the highlighted entry back to the
-clipboard; **Esc** dismisses.
+Press Super+V to open the picker.
+
+In the picker:
+
+- **Enter** — copy the highlighted entry back to the clipboard. Images paste back as images.
+- **Ctrl+S** — pin / unpin the highlighted entry (pins survive history eviction and clear-all).
+- **Ctrl+D** — delete the highlighted entry. Confirm by pressing **Ctrl+D** again; **Esc** cancels.
+- **Ctrl+Shift+C** — clear ALL history (pinned entries are kept). Confirm with **Ctrl+Shift+C**; **Esc** cancels.
+- **Esc** — quit.
+
+Copied **images** (PNG/JPEG/GIF/WebP/BMP) show a thumbnail in the picker (cached under
+`$XDG_CACHE_HOME/copyzen/thumbs`) and paste back with their correct type.
 
 ## Pinning
 
 Pins survive history rollover and appear once, with a `★`, at the top of the list — a
 pinned entry is hidden from the history section, so it never shows up twice.
 
-In the picker, highlight an entry and press **Ctrl+S** to toggle it:
-
-- on a history entry → it's pinned (copied into a separate `pinned` store the rolling
-  history never evicts);
-- on a `★` entry → it's unpinned and returns to the **top** of history, as if just copied.
-
-After `Ctrl+S` the picker reopens so you see the change (the `★` jumps to the top); keep
-toggling or press Esc to close. You can also toggle from a terminal by id:
+Pressing **Ctrl+S** on a history entry pins it (copied into a separate `pinned` store the
+rolling history never evicts); on a `★` entry it unpins and returns the entry to the **top**
+of history, as if just copied. The picker reopens after each toggle so you see the change.
+You can also toggle from a terminal by id:
 
 ```sh
 copyzen list                 # find the entry's id (first column)
