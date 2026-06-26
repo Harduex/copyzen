@@ -23,10 +23,12 @@ it — read the relevant one before changing that area.
 ## fuzzel / the picker
 - **Verify any keybinding or config by RUNNING fuzzel — its man page is incomplete.** Both
   `Control+d` and `Delete` are the `delete-next` default (undocumented); binding a taken key
-  is **fatal** — fuzzel errors and the picker won't open. Check:
+  is **fatal** — fuzzel errors and the picker won't open. Defaults are also
+  **version-dependent**: `Shift+Delete` became the `expunge` default in fuzzel 1.11, so a key
+  free on 1.9.2 can be taken on 1.12 — probe every version you support. Check:
   `printf x | fuzzel --dmenu --config dist/fuzzel.ini` → look for `err:` on stderr.
 - **Never override a fuzzel default** — bind only keys free in its defaults (additive), so
-  copyzen works out of the box. Current: pin `Control+s`, delete `Shift+Delete`, clear
+  copyzen works out of the box. Current: pin `Control+s`, delete `Control+Shift+d`, clear
   `Control+Shift+c` (`Control+p`=prev, `Control+c`/`Control+g`=cancel are taken).
 - The menu routes on fuzzel **exit codes** (`custom-1`→10, `custom-2`→11, `custom-3`→12), so
   changing which key does what is a `dist/fuzzel.ini` edit, not a menu-script change.
