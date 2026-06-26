@@ -49,6 +49,13 @@ withnth=
 if fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
 	withnth=--with-nth=2
 fi
+# fuzzel >= 1.11 can pre-highlight a row by index, so the highlight lands on the
+# live entry instead of always on row 0. Older fuzzel can't, so the • marker
+# (copyzen list --mark-active) stays as the fallback way to spot the live row.
+selectindex=
+if fuzzel --help 2>&1 | grep -q -- '--select-index'; then
+	selectindex=1
+fi
 
 state=list
 sel=
@@ -56,8 +63,16 @@ sel=
 while :; do
 	case "$state" in
 	list)
-		# Pipe the current clipboard in so copyzen can mark the live entry (●).
-		sel=$(wl-paste --no-newline 2>/dev/null | copyzen list --mark-active | fuzzel "$@" $withnth)
+		# When fuzzel supports it, pre-highlight the live row by its index (the
+		# clipboard is read separately so its bytes — possibly binary — stay off the
+		# shell variable, which would strip NULs). Falls back to the • marker alone.
+		selidx=
+		if [ -n "$selectindex" ]; then
+			i=$(wl-paste --no-newline 2>/dev/null | copyzen active-index)
+			[ -n "$i" ] && selidx="--select-index=$i"
+		fi
+		# Pipe the current clipboard in so copyzen can mark the live entry (•).
+		sel=$(wl-paste --no-newline 2>/dev/null | copyzen list --mark-active | fuzzel "$@" $withnth $selidx)
 		case "$?" in
 		0)  if [ -n "$sel" ]; then
 				t=$(printf '%s' "$sel" | copyzen mimetype)

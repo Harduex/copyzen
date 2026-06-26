@@ -124,3 +124,28 @@ func TestRunListMarkActive(t *testing.T) {
 		t.Errorf("alpha (clipboard) should carry the dot: %q", lines[1])
 	}
 }
+
+func TestRunActiveIndex(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	for _, v := range []string{"alpha", "beta", "gamma"} {
+		if err := run([]string{"store"}, strings.NewReader(v), io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// List is newest-first: gamma(0) beta(1) alpha(2). alpha is the clipboard.
+	var out bytes.Buffer
+	if err := run([]string{"active-index"}, strings.NewReader("alpha"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "2" {
+		t.Errorf("active-index for alpha = %q, want 2", got)
+	}
+	// A clipboard that matches no entry prints nothing.
+	out.Reset()
+	if err := run([]string{"active-index"}, strings.NewReader("nope"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "" {
+		t.Errorf("active-index for absent value = %q, want empty", got)
+	}
+}

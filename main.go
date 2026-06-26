@@ -17,7 +17,7 @@ var version = "dev"
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: copyzen {store|list|decode|delete|pin|unpin|toggle|wipe|mimetype|version}")
+		return fmt.Errorf("usage: copyzen {store|list|active-index|decode|delete|pin|unpin|toggle|wipe|mimetype|version}")
 	}
 	cmd := args[0]
 	if cmd == "version" {
@@ -79,6 +79,33 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		_ = store.PruneThumbs(keep) // best-effort; never break listing on cache errors
 		_, err = io.WriteString(stdout, b.String())
 		return err
+	case "active-index":
+		// Reads the current clipboard from stdin and prints the 0-based position of the
+		// live entry within List() — the same ordering the picker shows — or nothing if
+		// no entry is live. copyzen-menu feeds this to `fuzzel --select-index` so the
+		// highlight lands on the live row (the • marker is the fallback on older fuzzel).
+		clip, err := io.ReadAll(stdin)
+		if err != nil {
+			return err
+		}
+		activeID, err := s.Active(clip)
+		if err != nil {
+			return err
+		}
+		if activeID == 0 {
+			return nil
+		}
+		entries, err := s.List()
+		if err != nil {
+			return err
+		}
+		for i, e := range entries {
+			if e.ID == activeID {
+				_, err = fmt.Fprintln(stdout, i)
+				return err
+			}
+		}
+		return nil
 	case "decode":
 		id, err := readID(stdin)
 		if err != nil {
