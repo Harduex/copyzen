@@ -56,6 +56,12 @@ selectindex=
 if fuzzel --help 2>&1 | grep -q -- '--select-index'; then
 	selectindex=1
 fi
+# Newer fuzzel colours the prompt input separately, defaulting to a solarized grey that
+# clashes with the theme; set a neutral grey to match the terminal. Older fuzzel lacks the
+# flag (the input then follows the `text` colour), so this stays additive — no default override.
+if fuzzel --help 2>&1 | grep -q -- '--input-color'; then
+	set -- "$@" --input-color=888888ff
+fi
 
 state=list
 sel=
