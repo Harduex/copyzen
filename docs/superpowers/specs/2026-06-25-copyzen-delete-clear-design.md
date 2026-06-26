@@ -27,12 +27,12 @@ In the `copyzen-menu` fuzzel picker:
   it would override a default — against the standing "don't override a dependency's
   defaults" rule. `Control+Shift+c` (lowercase `c`; fuzzel never fires upper-case Shift
   combos) is free, additive, and keeps the "C = clear" mnemonic.
-- **Delete key: `Shift+Delete`.** (CORRECTION found in pre-deploy real-machine testing:
-  neither `Control+d` NOR the bare `Delete` key is free — both are fuzzel's `delete-next`
-  default, which the man page omits and only fuzzel's own config-parse error revealed;
-  binding either errored out and stopped the picker from opening. `Shift+Delete` is free,
-  overrides no default, and matches the browser address-bar "remove highlighted suggestion"
-  convention. Exit code stays custom-2 → 11, so the menu logic is unchanged.)
+- **Delete key: `Control+Shift+d`.** (Two corrections from real-machine testing: (1) neither
+  `Control+d` NOR the bare `Delete` key is free — both are fuzzel's `delete-next` default, which
+  the man page omits and only fuzzel's own config-parse error revealed. (2) `Shift+Delete` — the
+  original pick — became fuzzel's `expunge` default in 1.11, so it errors on newer fuzzel;
+  `Control+Shift+d` is free in both 1.9.2 and 1.12 and keeps a "D = delete" mnemonic alongside
+  `Control+Shift+c`. Exit code stays custom-2 → 11, so the menu logic is unchanged.)
 - **Delete confirm view: single item** (not full-list-with-marked-row). Unambiguous,
   symmetric with the clear view, and avoids fuzzel's inability to preselect/recolor a row.
 - **Clear confirm shows counts** (e.g. `Clear 37 history items · 4 pinned kept`).
@@ -58,7 +58,7 @@ All additive; none override a fuzzel default binding:
 ```ini
 [key-bindings]
 custom-1=Control+s         # toggle pin/unpin   -> exit 10 (existing)
-custom-2=Shift+Delete      # delete (confirmed) -> exit 11  (bare Delete/Control+d are fuzzel's delete-next)
+custom-2=Control+Shift+d   # delete (confirmed) -> exit 11  (Shift+Delete=expunge, Control+Delete=delete-next-word on fuzzel >=1.11)
 custom-3=Control+Shift+c   # clear all history  -> exit 12
 ```
 
