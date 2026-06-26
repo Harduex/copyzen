@@ -21,6 +21,11 @@ fi
 say()  { printf '==> %s\n' "$1"; }
 warn() { printf 'warning: %s\n' "$1" >&2; }
 die()  { printf 'error: %s\n' "$1" >&2; exit 1; }
+sha256_of() { # FILE -> hex digest
+	if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+	elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+	else die "no sha256 tool (sha256sum or shasum) found."; fi
+}
 
 os="$(uname -s)"
 [ "$os" = "Linux" ] || die "copyzen supports Linux/Wayland only (got $os)."
@@ -43,13 +48,7 @@ for f in "$asset" sha256sums.txt copyzen-menu copyzen-update fuzzel.ini copyzen.
 done
 
 say "Verifying checksum…"
-if command -v sha256sum >/dev/null 2>&1; then
-	have="$(sha256sum "$tmp/$asset" | awk '{print $1}')"
-elif command -v shasum >/dev/null 2>&1; then
-	have="$(shasum -a 256 "$tmp/$asset" | awk '{print $1}')"
-else
-	die "no sha256 tool (sha256sum or shasum) found."
-fi
+have="$(sha256_of "$tmp/$asset")"
 want="$(awk -v a="$asset" '$2 == a || $2 == "*" a {print $1}' "$tmp/sha256sums.txt")"
 [ -n "$want" ] || die "no checksum for $asset in sha256sums.txt."
 [ "$want" = "$have" ] || die "checksum mismatch for $asset (expected $want, got $have)."
@@ -74,13 +73,32 @@ $SUDO install -m 0755 "$tmp/$asset" "$PREFIX/copyzen"
 $SUDO install -m 0755 "$tmp/copyzen-menu" "$PREFIX/copyzen-menu"
 $SUDO install -m 0755 "$tmp/copyzen-update" "$PREFIX/copyzen-update"
 
+# fuzzel.ini is user-editable, BUT a stale shipped default must still reach people who never
+# touched it — e.g. a keybinding a newer fuzzel later claimed (Shift+Delete became `expunge` in
+# fuzzel 1.11). So: if the existing file is byte-identical to a default we have shipped, refresh
+# it to the current default; if the user customized it, leave it alone and drop the new default
+# beside it as fuzzel.ini.new to merge by hand. Append the new hash here whenever
+# dist/fuzzel.ini changes (see docs/RELEASING.md).
+shipped_default_hashes="
+fdb3aa7fdbc82c74588390d5d06da1e2610dcc6155953a63dce4a6d8bc88ecdd
+eec36e351e4abb602f8c3f5022ed072b0456c14b7ab05167c1d171a475d76faa
+d531c0c7717ed0308fe038991f1d9b616e133e601e43dc8f644b8c3206060019
+"
 cfg_dir="${XDG_CONFIG_HOME:-$HOME/.config}/copyzen"
 mkdir -p "$cfg_dir"
-if [ -f "$cfg_dir/fuzzel.ini" ]; then
-	say "Keeping existing $cfg_dir/fuzzel.ini"
+ini="$cfg_dir/fuzzel.ini"
+if [ ! -f "$ini" ]; then
+	install -m 0644 "$tmp/fuzzel.ini" "$ini"
+	say "Wrote $ini"
 else
-	install -m 0644 "$tmp/fuzzel.ini" "$cfg_dir/fuzzel.ini"
-	say "Wrote $cfg_dir/fuzzel.ini"
+	cur="$(sha256_of "$ini")"
+	if [ -n "$cur" ] && printf '%s\n' "$shipped_default_hashes" | grep -qxF "$cur"; then
+		install -m 0644 "$tmp/fuzzel.ini" "$ini"
+		say "Refreshed $ini to the current default (it was unmodified)."
+	else
+		install -m 0644 "$tmp/fuzzel.ini" "$ini.new"
+		say "Kept your customized $ini; new default written to $ini.new — review & merge (note: delete is now Ctrl+Shift+D)."
+	fi
 fi
 
 # Runtime deps: wl-clipboard (wl-paste/wl-copy) is core; fuzzel is the picker UI. Offer to

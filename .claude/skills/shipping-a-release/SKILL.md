@@ -48,3 +48,6 @@ the guardrails.
 - **No tag before a confirmed real-machine test** (step 2) — tests passing ≠ verified.
 - **No push without an explicit go-ahead** (step 3) — tagging publishes to a public repo.
 - **Leave nothing on an unverified dev build**: finish with `copyzen-update` / `restore`.
+- **If `dist/fuzzel.ini` changed this release, append its new `sha256sum` to
+  `shipped_default_hashes` in `install.sh`** before tagging — otherwise the config fix won't
+  reach existing users on update (see docs/RELEASING.md).

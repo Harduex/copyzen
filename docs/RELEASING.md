@@ -37,6 +37,11 @@ assets. Users then pull it with `copyzen-update`.
 
 ## Notes
 
+- **When `dist/fuzzel.ini` changes, append its new `sha256sum dist/fuzzel.ini` to
+  `shipped_default_hashes` in `install.sh`** (keep the older hashes). That list is how the
+  installer refreshes the config for users still on an *unmodified* older default so fixes
+  (e.g. a keybinding a newer fuzzel claimed) reach them; a *customized* config is never
+  overwritten — it gets a `fuzzel.ini.new` to merge instead.
 - Releases build with **Go 1.23** (pinned in `release.yml`); keep `go.mod`'s `go` directive
   at or below that, with no `toolchain` line, so CI doesn't try to fetch a newer toolchain.
 - `scripts/copyzen-devinstall` is a dev-only helper (build + install the working tree, or
