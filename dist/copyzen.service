@@ -2,12 +2,19 @@
 Description=copyzen clipboard recorder (wl-paste watcher)
 PartOf=graphical-session.target
 After=graphical-session.target
+# The Wayland socket can briefly refuse connections — at login before the compositor
+# finishes coming up, or when the compositor restarts/crashes mid-session — and wl-paste
+# then exits 1 ("connection refused"). Never give up on these transient failures: paired
+# with RestartSec below, systemd keeps retrying until the socket is back, instead of
+# firing off instant retries that trip the default start limit and die for the session.
+StartLimitIntervalSec=0
 
 [Service]
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # wl-paste options MUST precede --watch (everything after --watch is the command).
 ExecStart=/usr/bin/env wl-paste --no-newline --watch copyzen store
 Restart=on-failure
+RestartSec=2
 
 [Install]
 WantedBy=graphical-session.target
