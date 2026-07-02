@@ -71,10 +71,12 @@ while :; do
 	list)
 		# When fuzzel supports it, pre-highlight the live row by its index (the
 		# clipboard is read separately so its bytes — possibly binary — stay off the
-		# shell variable, which would strip NULs). Falls back to the • marker alone.
+		# shell variable, which would strip NULs). When nothing is live (e.g. the
+		# clipboard owner crashed and its offer died), highlight the newest unpinned
+		# row instead of the first pinned one — Enter then re-copies the latest item.
 		selidx=
 		if [ -n "$selectindex" ]; then
-			i=$(wl-paste --no-newline 2>/dev/null | copyzen active-index)
+			i=$(wl-paste --no-newline 2>/dev/null | copyzen active-index --fallback-newest)
 			[ -n "$i" ] && selidx="--select-index=$i"
 		fi
 		# Pipe the current clipboard in so copyzen can mark the live entry (•).

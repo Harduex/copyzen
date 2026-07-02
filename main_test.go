@@ -149,3 +149,58 @@ func TestRunActiveIndex(t *testing.T) {
 		t.Errorf("active-index for absent value = %q, want empty", got)
 	}
 }
+
+func TestRunActiveIndexFallbackNewest(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	for _, v := range []string{"alpha", "beta", "gamma"} {
+		if err := run([]string{"store"}, strings.NewReader(v), io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := run([]string{"pin"}, strings.NewReader("1"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	// List is pinned-first: alpha(0), then history newest-first: gamma(1) beta(2).
+	// No live match: fall back to the newest unpinned entry, not the first pinned row.
+	var out bytes.Buffer
+	if err := run([]string{"active-index", "--fallback-newest"}, strings.NewReader("nope"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "1" {
+		t.Errorf("fallback for absent value = %q, want 1 (newest unpinned)", got)
+	}
+	// An empty clipboard (e.g. the owner crashed) falls back the same way.
+	out.Reset()
+	if err := run([]string{"active-index", "--fallback-newest"}, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "1" {
+		t.Errorf("fallback for empty clipboard = %q, want 1 (newest unpinned)", got)
+	}
+	// A live match still wins over the fallback.
+	out.Reset()
+	if err := run([]string{"active-index", "--fallback-newest"}, strings.NewReader("beta"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "2" {
+		t.Errorf("fallback with live match = %q, want 2 (the match)", got)
+	}
+}
+
+func TestRunActiveIndexFallbackAllPinned(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	if err := run([]string{"store"}, strings.NewReader("alpha"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"pin"}, strings.NewReader("1"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	// Only pinned entries exist: nothing to fall back to, print nothing.
+	var out bytes.Buffer
+	if err := run([]string{"active-index", "--fallback-newest"}, strings.NewReader("nope"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "" {
+		t.Errorf("fallback with only pinned entries = %q, want empty", got)
+	}
+}

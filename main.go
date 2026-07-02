@@ -84,6 +84,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		// live entry within List() — the same ordering the picker shows — or nothing if
 		// no entry is live. copyzen-menu feeds this to `fuzzel --select-index` so the
 		// highlight lands on the live row (the • marker is the fallback on older fuzzel).
+		// With --fallback-newest, a clipboard that matches nothing (or is empty — e.g.
+		// its owner crashed) instead yields the newest unpinned entry, so the highlight
+		// lands on the most recent copy rather than the first pinned row.
+		fallback := false
+		for _, a := range args[1:] {
+			if a == "--fallback-newest" {
+				fallback = true
+			}
+		}
 		clip, err := io.ReadAll(stdin)
 		if err != nil {
 			return err
@@ -92,7 +101,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if activeID == 0 {
+		if activeID == 0 && !fallback {
 			return nil
 		}
 		entries, err := s.List()
@@ -100,7 +109,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return err
 		}
 		for i, e := range entries {
-			if e.ID == activeID {
+			if e.ID == activeID || (activeID == 0 && !e.Pinned) {
 				_, err = fmt.Fprintln(stdout, i)
 				return err
 			}
