@@ -169,19 +169,8 @@ func (s *Store) Add(payload []byte, capN int) error {
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		h := tx.Bucket([]byte(bucketHistory))
-		// Collect keys of existing duplicates (cursor keys are only valid during the
-		// scan, so copy them) and delete them before inserting the fresh entry on top.
-		var dups [][]byte
-		c := h.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if bytes.Equal(v, payload) {
-				dups = append(dups, append([]byte(nil), k...))
-			}
-		}
-		for _, k := range dups {
-			if err := h.Delete(k); err != nil {
-				return err
-			}
+		if err := dropEqual(h, payload); err != nil {
+			return err
 		}
 		id, err := nextID(tx)
 		if err != nil {
@@ -192,6 +181,25 @@ func (s *Store) Add(payload []byte, capN int) error {
 		}
 		return evict(h, capN)
 	})
+}
+
+// dropEqual deletes every entry in b whose payload is byte-identical to payload.
+// Keys are collected first (cursor keys are only valid during the scan, so copy
+// them) and deleted after.
+func dropEqual(b *bolt.Bucket, payload []byte) error {
+	var dups [][]byte
+	c := b.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if bytes.Equal(v, payload) {
+			dups = append(dups, append([]byte(nil), k...))
+		}
+	}
+	for _, k := range dups {
+		if err := b.Delete(k); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // evict deletes the oldest history entries while the count exceeds capN. It only
@@ -302,17 +310,8 @@ func (s *Store) Pin(id uint64) error {
 // returns to the top of history as if freshly copied (and never duplicated).
 func promoteToHistory(tx *bolt.Tx, payload []byte, capN int) error {
 	h := tx.Bucket([]byte(bucketHistory))
-	var dups [][]byte
-	c := h.Cursor()
-	for k, v := c.First(); k != nil; k, v = c.Next() {
-		if bytes.Equal(v, payload) {
-			dups = append(dups, append([]byte(nil), k...))
-		}
-	}
-	for _, k := range dups {
-		if err := h.Delete(k); err != nil {
-			return err
-		}
+	if err := dropEqual(h, payload); err != nil {
+		return err
 	}
 	id, err := nextID(tx)
 	if err != nil {
@@ -358,16 +357,27 @@ func (s *Store) Unpin(id uint64, capN int) error {
 }
 
 // Delete removes id from whichever bucket holds it (ids are unique across buckets).
+// Deleting a pinned entry also drops byte-identical history copies: Pin leaves the
+// history copy in place and List hides it behind the pin, so the picker shows one
+// row — deleting that row must delete the content, not resurface the hidden twin
+// as if it were merely unpinned. Deleting a history entry never touches pins.
 func (s *Store) Delete(id uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		key := itob(id)
-		for _, name := range []string{bucketHistory, bucketPinned} {
-			b := tx.Bucket([]byte(name))
-			if b.Get(key) != nil {
-				return b.Delete(key)
-			}
+		h := tx.Bucket([]byte(bucketHistory))
+		if h.Get(key) != nil {
+			return h.Delete(key)
 		}
-		return ErrNotFound
+		p := tx.Bucket([]byte(bucketPinned))
+		v := p.Get(key)
+		if v == nil {
+			return ErrNotFound
+		}
+		payload := append([]byte(nil), v...)
+		if err := p.Delete(key); err != nil {
+			return err
+		}
+		return dropEqual(h, payload)
 	})
 }
 

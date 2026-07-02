@@ -310,6 +310,29 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestDeletePinnedRemovesHiddenHistoryTwin(t *testing.T) {
+	s := newTestStore(t)
+	_ = s.Add([]byte("x"), 100) // history id 1
+	_ = s.Pin(1)                // pinned copy id 2; history copy stays, hidden by List
+	_ = s.Add([]byte("y"), 100) // id 3 — unrelated, must survive the sweep
+
+	if err := s.Delete(2); err != nil { // delete the PINNED row (the one the picker shows)
+		t.Fatal(err)
+	}
+	// The picker showed one row for "x"; deleting it must delete the content,
+	// not resurface the hidden history twin as if it were merely unpinned.
+	if _, err := s.Get(1); err != ErrNotFound {
+		t.Error("hidden history twin should be deleted along with the pin")
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Preview != "y" {
+		t.Fatalf("after deleting pinned x, list = %+v, want only y", entries)
+	}
+}
+
 func TestWipeKeepsPins(t *testing.T) {
 	s := newTestStore(t)
 	_ = s.Add([]byte("h1"), 100)
