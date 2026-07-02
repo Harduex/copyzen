@@ -120,10 +120,17 @@ Recording is `wl-paste --no-newline --watch copyzen store` — wl-paste options 
 **before** `--watch` (everything after `--watch` is the command it runs). Pasting back is
 `copyzen decode | wl-copy`. Both round-trip the clipboard byte-for-byte.
 
+When the recorder stores an image whose offer carries exactly one mime type (the shape
+screenshot tools produce), it re-owns the offer via `wl-copy --type`, so the image stays
+pasteable even if the app that copied it exits or crashes. Multi-mime offers are left
+untouched, and text is never re-owned.
+
 ## Configuration
 
 - `COPYZEN_MAX_HISTORY` — history cap (default `100`; non-positive/invalid values fall back
   to the default). Pinned entries are never capped.
+- `COPYZEN_PERSIST_IMAGES` — set to `0` to disable the image re-own behavior described
+  above (default on).
 - Database: `$XDG_DATA_HOME/copyzen/store.db` (default `~/.local/share/copyzen/store.db`).
 
 The installer starts the recorder now **and on every login** — preferring a systemd user

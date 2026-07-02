@@ -122,6 +122,31 @@ func nextID(tx *bolt.Tx) (uint64, error) {
 	return cur, m.Put([]byte("seq"), itob(cur))
 }
 
+// SetPersistEcho records the checksum of a payload copyzen itself just re-owned on the
+// clipboard, so the watch event that copy fires back can be recognized as our own.
+func (s *Store) SetPersistEcho(sum []byte) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(bucketMeta)).Put([]byte("persistEcho"), sum)
+	})
+}
+
+// ConsumePersistEcho clears any recorded echo and reports whether it matched sum.
+// Clearing unconditionally is what makes the guard one-shot: the echo event is always
+// the next watch event, so whatever arrives next invalidates a stale marker.
+func (s *Store) ConsumePersistEcho(sum []byte) (bool, error) {
+	var hit bool
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		m := tx.Bucket([]byte(bucketMeta))
+		v := m.Get([]byte("persistEcho"))
+		if v == nil {
+			return nil
+		}
+		hit = bytes.Equal(v, sum)
+		return m.Delete([]byte("persistEcho"))
+	})
+	return hit, err
+}
+
 // lookup returns a heap copy of the payload for id from history then pinned, or nil.
 // The copy keeps the bytes valid after the transaction and across same-transaction
 // writes that may remap the underlying mmap.

@@ -501,3 +501,27 @@ func TestListDedupsHistory(t *testing.T) {
 		t.Errorf("duplicate payload should be listed once, got %d", n)
 	}
 }
+
+func TestPersistEchoOneShot(t *testing.T) {
+	s := newTestStore(t)
+	a, b := []byte("sum-a"), []byte("sum-b")
+	if err := s.SetPersistEcho(a); err != nil {
+		t.Fatal(err)
+	}
+	if hit, err := s.ConsumePersistEcho(a); err != nil || !hit {
+		t.Fatalf("consume matching echo = %v, %v; want hit", hit, err)
+	}
+	if hit, _ := s.ConsumePersistEcho(a); hit {
+		t.Error("echo must be one-shot: second consume still hit")
+	}
+	// A mismatched consume clears the marker too — any next event invalidates it.
+	if err := s.SetPersistEcho(a); err != nil {
+		t.Fatal(err)
+	}
+	if hit, _ := s.ConsumePersistEcho(b); hit {
+		t.Error("mismatched consume reported a hit")
+	}
+	if hit, _ := s.ConsumePersistEcho(a); hit {
+		t.Error("stale echo survived a mismatched consume")
+	}
+}

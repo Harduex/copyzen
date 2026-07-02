@@ -2,12 +2,41 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/png"
 	"io"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	// Tests must never reach the session's real clipboard: neuter the persistence
+	// hooks; tests that exercise persistence install their own recording stubs.
+	listClipboardTypes = func() ([]string, error) { return nil, nil }
+	reownClipboard = func(string, []byte) error { return errors.New("reown disabled in tests") }
+	os.Exit(m.Run())
+}
+
+type persistCall struct {
+	mime string
+	data string
+}
+
+// stubPersist makes the live offer look like `types` and records re-own calls.
+func stubPersist(t *testing.T, types []string) (calls *[]persistCall, lookups *int) {
+	t.Helper()
+	calls, lookups = &[]persistCall{}, new(int)
+	prevList, prevReown := listClipboardTypes, reownClipboard
+	listClipboardTypes = func() ([]string, error) { *lookups++; return types, nil }
+	reownClipboard = func(mime string, data []byte) error {
+		*calls = append(*calls, persistCall{mime, string(data)})
+		return nil
+	}
+	t.Cleanup(func() { listClipboardTypes, reownClipboard = prevList, prevReown })
+	return calls, lookups
+}
 
 func TestRunRoundTrip(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
@@ -202,5 +231,108 @@ func TestRunActiveIndexFallbackAllPinned(t *testing.T) {
 	}
 	if got := out.String(); got != "" {
 		t.Errorf("fallback with only pinned entries = %q, want empty", got)
+	}
+}
+
+func TestRunStorePersistsScreenshotOffer(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	calls, _ := stubPersist(t, []string{"image/png"})
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 {
+		t.Fatalf("re-own calls = %d, want 1", len(*calls))
+	}
+	if (*calls)[0].mime != "image/png" {
+		t.Errorf("re-owned mime = %q, want image/png", (*calls)[0].mime)
+	}
+	if (*calls)[0].data != payload {
+		t.Errorf("re-owned payload differs from stored bytes")
+	}
+}
+
+func TestRunStorePersistEchoGuard(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	calls, _ := stubPersist(t, []string{"image/png"})
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	for i, want := range []int{1, 1, 2} {
+		// 1st store: fresh copy, re-owns. 2nd: our own echo event, must not re-own
+		// again (no loop). 3rd: a fresh legitimate re-copy, re-owns again.
+		if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+			t.Fatal(err)
+		}
+		if len(*calls) != want {
+			t.Fatalf("after store #%d: re-own calls = %d, want %d", i+1, len(*calls), want)
+		}
+	}
+}
+
+func TestRunStoreSkipsMultiMimeOffer(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	calls, _ := stubPersist(t, []string{"image/png", "text/html"})
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("multi-mime offer re-owned %d times, want 0 (never flatten)", len(*calls))
+	}
+}
+
+func TestRunStoreSkipsMimeMismatch(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	calls, _ := stubPersist(t, []string{"image/jpeg"})
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("mismatched offer re-owned %d times, want 0", len(*calls))
+	}
+}
+
+func TestRunStoreSkipsTextPayload(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	calls, lookups := stubPersist(t, []string{"text/plain;charset=utf-8"})
+	if err := run([]string{"store"}, strings.NewReader("plain text"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("text payload re-owned %d times, want 0", len(*calls))
+	}
+	if *lookups != 0 {
+		t.Errorf("text payload triggered %d type lookups, want 0 (text path stays free)", *lookups)
+	}
+}
+
+func TestRunStorePersistKillSwitch(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("COPYZEN_PERSIST_IMAGES", "0")
+	calls, _ := stubPersist(t, []string{"image/png"})
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("kill switch on, yet re-owned %d times, want 0", len(*calls))
+	}
+}
+
+func TestRunStorePersistFailureIsBestEffort(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	attempts := 0
+	_, _ = stubPersist(t, []string{"image/png"})
+	reownClipboard = func(string, []byte) error { attempts++; return errors.New("wl-copy exploded") }
+	payload := string([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3})
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatalf("store must not fail when re-own fails: %v", err)
+	}
+	// A failed re-own leaves no echo, so the next identical copy tries again.
+	if err := run([]string{"store"}, strings.NewReader(payload), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 2 {
+		t.Errorf("re-own attempts = %d, want 2 (no echo recorded on failure)", attempts)
 	}
 }

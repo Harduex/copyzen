@@ -12,6 +12,11 @@ it — read the relevant one before changing that area.
   decode.
 - **History dedups across all entries (move-to-top):** re-copying a value removes its older
   entry and re-adds it on top — no duplicates anywhere in history.
+- **The recorder re-owns single-mime image offers** (`persistImage`: the COSMIC screenshot
+  portal offers bare `image/png` and its offer dies when the portal crashes) — never
+  multi-mime offers (re-owning would flatten them) and never text. The `persistEcho` key in
+  the meta bucket breaks the self-trigger loop: our own `wl-copy` re-fires the watcher, and
+  the next event consumes-and-clears the marker. `COPYZEN_PERSIST_IMAGES=0` kills it.
 
 ## bbolt store
 - **Eviction counts via cursor traversal, not `Stats().KeyN`** — Stats reflects only

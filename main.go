@@ -4,9 +4,12 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -14,6 +17,22 @@ import (
 )
 
 var version = "dev"
+
+// listClipboardTypes and reownClipboard shell out to wl-clipboard; package variables
+// so tests can stub the session away.
+var listClipboardTypes = func() ([]string, error) {
+	out, err := exec.Command("wl-paste", "--list-types").Output()
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(out)), nil
+}
+
+var reownClipboard = func(mime string, data []byte) error {
+	cmd := exec.Command("wl-copy", "--type", mime)
+	cmd.Stdin = bytes.NewReader(data)
+	return cmd.Run()
+}
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) < 1 {
@@ -41,7 +60,11 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		return s.Add(data, capFromEnv())
+		if err := s.Add(data, capFromEnv()); err != nil {
+			return err
+		}
+		persistImage(s, data)
+		return nil
 	case "list":
 		// With --mark-active, stdin carries the current clipboard; the matching entry is
 		// flagged with ● so the live item is identifiable wherever the highlight moves.
@@ -168,6 +191,38 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return s.Wipe()
 	default:
 		return fmt.Errorf("unknown command %q", cmd)
+	}
+}
+
+// persistImage re-owns a just-recorded single-mime image offer via wl-copy, so the
+// clipboard survives its original owner crashing (COSMIC's screenshot portal offers
+// bare image/png and dies on compositor hiccups, taking the offer with it). Multi-mime
+// offers are left alone so re-owning never flattens one, and text is never touched.
+// Best-effort: failures log and recording always wins. COPYZEN_PERSIST_IMAGES=0 disables.
+func persistImage(s *store.Store, data []byte) {
+	if os.Getenv("COPYZEN_PERSIST_IMAGES") == "0" {
+		return
+	}
+	// Consume before any other gate so a stale echo (lost event) is invalidated by
+	// whatever arrives next, never by-passing a future legitimate re-own.
+	sum := sha256.Sum256(data)
+	if hit, err := s.ConsumePersistEcho(sum[:]); err != nil || hit {
+		return
+	}
+	mime, _, ok := store.SniffImage(data)
+	if !ok {
+		return
+	}
+	types, err := listClipboardTypes()
+	if err != nil || len(types) != 1 || types[0] != mime {
+		return
+	}
+	if err := reownClipboard(mime, data); err != nil {
+		fmt.Fprintln(os.Stderr, "copyzen: persist image:", err)
+		return
+	}
+	if err := s.SetPersistEcho(sum[:]); err != nil {
+		fmt.Fprintln(os.Stderr, "copyzen: persist image:", err)
 	}
 }
 
