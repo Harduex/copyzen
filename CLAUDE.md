@@ -32,6 +32,10 @@ it — read the relevant one before changing that area.
   **version-dependent**: `Shift+Delete` became the `expunge` default in fuzzel 1.11, so a key
   free on 1.9.2 can be taken on 1.12 — probe every version you support. Check:
   `printf x | fuzzel --dmenu --config dist/fuzzel.ini` → look for `err:` on stderr.
+- **A flag's presence ≠ usable behavior.** `--select-index` exists since fuzzel 1.12, but
+  until 1.14 typing keeps the selection glued to that row *index* instead of reverting to
+  the first match (fuzzel #684) — a stuck highlight while searching. The menu gates the
+  pre-highlight on `fuzzel --version` ≥ 1.14, not on `--help` listing the flag.
 - **Never override a fuzzel default** — bind only keys free in its defaults (additive), so
   copyzen works out of the box. Current: pin `Control+s`, delete `Control+Shift+d`, clear
   `Control+Shift+c` (`Control+p`=prev, `Control+c`/`Control+g`=cancel are taken).

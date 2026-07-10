@@ -49,11 +49,15 @@ withnth=
 if fuzzel --help 2>&1 | grep -q -- '--with-nth'; then
 	withnth=--with-nth=2
 fi
-# fuzzel >= 1.11 can pre-highlight a row by index, so the highlight lands on the
-# live entry instead of always on row 0. Older fuzzel can't, so the • marker
-# (copyzen list --mark-active) stays as the fallback way to spot the live row.
+# fuzzel >= 1.14 can pre-highlight a row by index, so the highlight lands on the
+# live entry instead of always on row 0. The --select-index flag itself exists
+# since 1.12, but before 1.14 typing keeps the selection glued to that row
+# *index* instead of reverting to the first match (fuzzel #684) — a stuck
+# highlight while searching — so gate on the version, not flag presence. On
+# older fuzzel the • marker (copyzen list --mark-active) marks the live row.
 selectindex=
-if fuzzel --help 2>&1 | grep -q -- '--select-index'; then
+fver=$(fuzzel --version 2>/dev/null | sed -n 's/^fuzzel version: \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
+if [ -n "$fver" ] && { [ "${fver% *}" -gt 1 ] || [ "${fver#* }" -ge 14 ]; }; then
 	selectindex=1
 fi
 # Newer fuzzel colours the prompt input separately, defaulting to a solarized grey that
