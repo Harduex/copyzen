@@ -133,6 +133,10 @@ fi
 # Recorder: start now + on every login. Prefer a systemd --user service (auto-restarts on
 # crash); fall back to an XDG autostart entry where a systemd --user instance isn't usable.
 # wl-paste options MUST precede --watch — everything after --watch is the command to run.
+# The watcher execs `copyzen` on every clipboard event; a bare name resolves only when
+# PREFIX happens to be on the unit's fixed PATH (or the session PATH, for autostart) and
+# otherwise records nothing while the unit looks healthy — so pin the installed binary.
+sed -i "s|--watch copyzen store|--watch $PREFIX/copyzen store|" "$tmp/copyzen.service" "$tmp/copyzen.desktop"
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 autostart="$cfg/autostart/copyzen.desktop"
 recorder_done=0
@@ -155,7 +159,7 @@ if [ "$recorder_done" = 0 ]; then
 	install -m 0644 "$tmp/copyzen.desktop" "$autostart"
 	say "Recorder: installed XDG autostart entry (starts on next login)."
 	if command -v wl-paste >/dev/null 2>&1 && ! pgrep -f 'wl-paste.*--watch.*copyzen store$' >/dev/null 2>&1; then
-		setsid wl-paste --no-newline --watch copyzen store >/dev/null 2>&1 &
+		setsid wl-paste --no-newline --watch "$PREFIX/copyzen" store >/dev/null 2>&1 &
 		say "Started the clipboard recorder for this session."
 	fi
 fi
