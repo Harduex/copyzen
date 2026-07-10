@@ -25,10 +25,10 @@ that `wl-paste` watcher.
 
 ## Install
 
-One-liner (pinned to a release tag — replace `v0.1.0` with the latest):
+One-liner (always installs the latest release, with the installer that shipped with it):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Harduex/copyzen/v0.1.0/install.sh | sh
+curl -fsSL https://github.com/Harduex/copyzen/releases/latest/download/install.sh | sh
 ```
 
 It detects your arch, downloads the prebuilt binary from this repo's Releases, **verifies
@@ -43,12 +43,12 @@ tells you if either is missing (it won't guess your package manager).
 ### Manual (download, read, run)
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/Harduex/copyzen/v0.1.0/install.sh
+curl -fsSLO https://github.com/Harduex/copyzen/releases/latest/download/install.sh
 less install.sh        # read before running
 sh install.sh
 ```
 
-Pin a specific build with `COPYZEN_VERSION=v0.1.0 sh install.sh`.
+Pin a specific build with `COPYZEN_VERSION=vX.Y.Z sh install.sh`.
 
 ### From source
 
