@@ -1,5 +1,7 @@
 # copyzen
 
+![Copyzen Logo](https://repository-images.githubusercontent.com/1280293186/05388598-9aca-4207-bf0c-0e595f9acdcf)
+
 A minimalist Wayland clipboard-history manager with pinning, for Pop!_OS COSMIC and any
 Wayland compositor with `wl-clipboard`.
 
