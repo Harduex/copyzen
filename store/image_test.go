@@ -24,11 +24,17 @@ func TestSniffImage(t *testing.T) {
 	}{
 		{"png", []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0}, "image/png", "png", true},
 		{"jpeg", []byte{0xFF, 0xD8, 0xFF, 0xE0}, "image/jpeg", "jpg", true},
-		{"gif87", []byte("GIF87a....."), "image/gif", "gif", true},
-		{"gif89", []byte("GIF89a....."), "image/gif", "gif", true},
+		{"gif87", []byte("GIF87a\x01\x00\x01\x00\x00\x00\x00;"), "image/gif", "gif", true},
+		{"gif89", []byte("GIF89a\x01\x00\x01\x00\x00\x00\x00;"), "image/gif", "gif", true},
 		{"webp", append([]byte("RIFF\x00\x00\x00\x00WEBP"), 0, 0), "image/webp", "webp", true},
-		{"bmp", []byte("BM\x00\x00\x00\x00"), "image/bmp", "bmp", true},
+		{"bmp", []byte("BM\x3a\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28\x00\x00\x00"), "image/bmp", "bmp", true},
+		{"bmp-os2-core", []byte("BM\x1a\x00\x00\x00\x00\x00\x00\x00\x1a\x00\x00\x00\x0c\x00\x00\x00"), "image/bmp", "bmp", true},
 		{"text", []byte("hello world"), "", "", false},
+		{"text-bm-prefix", []byte("BMW is a great car"), "", "", false},
+		{"text-gif-prefix", []byte("GIF89a header, then the screen descriptor"), "", "", false},
+		{"text-gif87-prefix", []byte("GIF87a"), "", "", false},
+		{"bmp-truncated", []byte("BM\x00\x00\x00\x00"), "", "", false},
+		{"bmp-reserved-set", []byte("BM\x3a\x00\x00\x00\x01\x00\x00\x00\x36\x00\x00\x00\x28\x00\x00\x00"), "", "", false},
 		{"empty", []byte{}, "", "", false},
 		{"png-truncated", []byte{0x89, 'P', 'N'}, "", "", false},
 		{"riff-not-webp", []byte("RIFF\x00\x00\x00\x00AVI "), "", "", false},
@@ -86,6 +92,30 @@ func TestThumbnailFormats(t *testing.T) {
 	for name, src := range map[string][]byte{"jpeg": jpg.Bytes(), "gif": g.Bytes(), "bmp": bm.Bytes()} {
 		if _, err := Thumbnail(src, 128); err != nil {
 			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestSniffImageRealEncodings(t *testing.T) {
+	rgba := image.NewRGBA(image.Rect(0, 0, 20, 20))
+	var g, bm bytes.Buffer
+	if err := gif.Encode(&g, rgba, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := bmp.Encode(&bm, rgba); err != nil {
+		t.Fatal(err)
+	}
+	gif87 := append([]byte("GIF87a"), g.Bytes()[6:]...)
+	for name, c := range map[string]struct {
+		src  []byte
+		mime string
+	}{
+		"gif89": {g.Bytes(), "image/gif"},
+		"gif87": {gif87, "image/gif"},
+		"bmp":   {bm.Bytes(), "image/bmp"},
+	} {
+		if mime, _, ok := SniffImage(c.src); !ok || mime != c.mime {
+			t.Errorf("%s: SniffImage = (%q,%v), want (%q,true)", name, mime, ok, c.mime)
 		}
 	}
 }

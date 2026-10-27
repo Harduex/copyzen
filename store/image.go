@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
@@ -28,14 +29,36 @@ func SniffImage(b []byte) (mime, ext string, ok bool) {
 		return "image/png", "png", true
 	case len(b) >= 3 && bytes.HasPrefix(b, []byte{0xFF, 0xD8, 0xFF}):
 		return "image/jpeg", "jpg", true
-	case len(b) >= 6 && (bytes.HasPrefix(b, []byte("GIF87a")) || bytes.HasPrefix(b, []byte("GIF89a"))):
+	case (bytes.HasPrefix(b, []byte("GIF87a")) || bytes.HasPrefix(b, []byte("GIF89a"))) && isGIF(b):
 		return "image/gif", "gif", true
 	case len(b) >= 12 && bytes.HasPrefix(b, []byte("RIFF")) && bytes.Equal(b[8:12], []byte("WEBP")):
 		return "image/webp", "webp", true
-	case len(b) >= 2 && bytes.HasPrefix(b, []byte("BM")):
+	case bytes.HasPrefix(b, []byte("BM")) && isBMP(b):
 		return "image/bmp", "bmp", true
 	}
 	return "", "", false
+}
+
+// The GIF and BMP signatures are plain ASCII, so text such as "BMW is…" or "GIF89a is…"
+// carries them too; isGIF and isBMP also require the binary structure behind them.
+
+// isGIF requires a NUL byte: every GIF block, including each frame's image data, ends
+// with a zero-length terminator, while clipboard text practically never contains NUL.
+func isGIF(b []byte) bool {
+	return bytes.IndexByte(b[6:], 0) >= 0
+}
+
+// isBMP requires the file header's zero reserved field and a DIB header size that one
+// of the BMP variants defines (OS/2 core 12 through BITMAPV5HEADER 124).
+func isBMP(b []byte) bool {
+	if len(b) < 18 || binary.LittleEndian.Uint32(b[6:10]) != 0 {
+		return false
+	}
+	switch binary.LittleEndian.Uint32(b[14:18]) {
+	case 12, 16, 40, 52, 56, 64, 108, 124:
+		return true
+	}
+	return false
 }
 
 // ImageLabel renders the DISPLAY preview for an image entry, e.g. "🖼 PNG · 2.3 MB".

@@ -104,6 +104,20 @@ func TestRunMimetype(t *testing.T) {
 	}
 }
 
+func TestRunMimetypeTextWithImageSignature(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	if err := run([]string{"store"}, strings.NewReader("BMW is a great car"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"mimetype"}, strings.NewReader("1"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "" {
+		t.Errorf("mimetype: got %q want empty (text must paste back as text)", out.String())
+	}
+}
+
 func TestRunListEmitsIcon(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
