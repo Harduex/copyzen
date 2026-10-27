@@ -80,7 +80,7 @@ In the picker:
 - **Ctrl+Shift+C** — clear ALL history (pinned entries are kept). A confirm view appears; press **Enter** to confirm, **Esc** to cancel.
 - **Esc** — quit.
 
-The entry currently on your clipboard is marked with a leading **•** dot, so you can spot it even after moving the highlight. On **fuzzel ≥ 1.12** the picker also opens with that live entry pre-highlighted; on older fuzzel the **•** dot is the only indicator.
+The entry currently on your clipboard is marked with a leading **•** dot, so you can spot it even after moving the highlight. On **fuzzel ≥ 1.14** the picker also opens with that live entry pre-highlighted; on older fuzzel the **•** dot is the only indicator.
 
 Copied **images** (PNG/JPEG/GIF/WebP/BMP) show a thumbnail in the picker (cached under
 `$XDG_CACHE_HOME/copyzen/thumbs`) and paste back with their correct type.
@@ -121,7 +121,7 @@ pipes straight in).
 
 | Command | stdin | Effect / output |
 |---|---|---|
-| `copyzen store` | raw bytes | store into history (skips empty, dedups vs most-recent, evicts beyond cap) |
+| `copyzen store` | raw bytes | store into history (skips empty, moves a re-copied value to the top instead of duplicating it, evicts beyond cap) |
 | `copyzen list` | — | `id<TAB>preview` lines — pinned (`★`) first, then history, newest-first |
 | `copyzen decode` | id / line | write the original payload to stdout, **byte-for-byte** |
 | `copyzen delete` | id / line | remove the entry from whichever store holds it |
