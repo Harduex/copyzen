@@ -8,6 +8,8 @@
 # fuzzel exits on every action key and cannot reload its list, so each action
 # relaunches fuzzel; confirmations relaunch into a confirm-state view. Pinned items
 # are never cleared by Ctrl+Shift+C — remove them one-by-one with Ctrl+Shift+D.
+# Exits 0 only when an entry was copied, so a paste keystroke can be chained after
+# it (`copyzen-menu && wtype -M ctrl v -m ctrl`) without firing on Esc.
 # No `set -e`: fuzzel's non-zero exits are control flow, not errors.
 set -u
 
@@ -86,19 +88,18 @@ while :; do
 		# Pipe the current clipboard in so copyzen can mark the live entry (•).
 		sel=$(wl-paste --no-newline 2>/dev/null | copyzen list --mark-active | fuzzel "$@" $withnth $selidx)
 		case "$?" in
-		0)  if [ -n "$sel" ]; then
-				t=$(printf '%s' "$sel" | copyzen mimetype)
-				if [ -n "$t" ]; then
-					printf '%s' "$sel" | copyzen decode | wl-copy --type "$t"
-				else
-					printf '%s' "$sel" | copyzen decode | wl-copy
-				fi
+		0)  [ -n "$sel" ] || exit 1
+			t=$(printf '%s' "$sel" | copyzen mimetype)
+			if [ -n "$t" ]; then
+				printf '%s' "$sel" | copyzen decode | wl-copy --type "$t"
+			else
+				printf '%s' "$sel" | copyzen decode | wl-copy
 			fi
 			exit 0 ;;
 		10) [ -n "$sel" ] && printf '%s' "$sel" | copyzen toggle ;;
 		11) [ -n "$sel" ] && state=confirm-delete ;;
 		12) state=confirm-clear ;;
-		*)  exit 0 ;;
+		*)  exit 1 ;;
 		esac
 		;;
 	confirm-delete)

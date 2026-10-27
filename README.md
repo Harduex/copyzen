@@ -85,6 +85,19 @@ The entry currently on your clipboard is marked with a leading **•** dot, so y
 Copied **images** (PNG/JPEG/GIF/WebP/BMP) show a thumbnail in the picker (cached under
 `$XDG_CACHE_HOME/copyzen/thumbs`) and paste back with their correct type.
 
+## Auto-paste
+
+`copyzen-menu` exits `0` only when an entry was copied, so you can chain a paste keystroke
+after it — Esc never pastes. With [`wtype`](https://github.com/atx/wtype), set the Super+V
+command to:
+
+```sh
+sh -c 'copyzen-menu && wtype -M ctrl v -m ctrl'
+```
+
+Terminals paste with Ctrl+Shift+V: use `wtype -M ctrl -M shift v -m shift -m ctrl` there.
+`wtype` needs a compositor that supports the virtual-keyboard protocol (COSMIC does).
+
 ## Pinning
 
 Pins survive history rollover and appear once, with a `★`, at the top of the list — a
