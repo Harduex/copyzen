@@ -350,3 +350,58 @@ func TestRunStorePersistFailureIsBestEffort(t *testing.T) {
 		t.Errorf("re-own attempts = %d, want 2 (no echo recorded on failure)", attempts)
 	}
 }
+
+func TestRunHelpAndUnknownSkipTheStore(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dir)
+	for _, arg := range []string{"help", "-h", "--help"} {
+		var out bytes.Buffer
+		if err := run([]string{arg}, nil, &out); err != nil {
+			t.Fatalf("%s: %v", arg, err)
+		}
+		if !strings.HasPrefix(out.String(), "usage: copyzen") {
+			t.Errorf("%s printed %q, want the usage line", arg, out.String())
+		}
+	}
+	if err := run([]string{"bogus"}, nil, io.Discard); err == nil {
+		t.Error("unknown command should error")
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("help and unknown commands must not create the store, found %v", entries)
+	}
+}
+
+func TestRunErrorsCarryNoProgramPrefix(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	for _, in := range []string{"999", ""} { // unknown id, no id: main adds the one prefix
+		err := run([]string{"decode"}, strings.NewReader(in), io.Discard)
+		if err == nil || strings.HasPrefix(err.Error(), "copyzen:") {
+			t.Errorf("decode %q: got error %v, want one without a copyzen: prefix", in, err)
+		}
+	}
+}
+
+func TestRunCountIgnoresStarText(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	for _, p := range []string{"plain", "★ five-star review"} {
+		if err := run([]string{"store"}, strings.NewReader(p), io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count := func() string {
+		var out bytes.Buffer
+		if err := run([]string{"count"}, nil, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	if got := count(); got != "2 0\n" {
+		t.Errorf("count = %q, want \"2 0\\n\" (text starting with ★ is history)", got)
+	}
+	if err := run([]string{"pin"}, strings.NewReader("1"), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(); got != "1 1\n" {
+		t.Errorf("count after pinning = %q, want \"1 1\\n\"", got)
+	}
+}

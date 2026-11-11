@@ -22,7 +22,7 @@ const (
 const DefaultCap = 100
 
 // ErrNotFound is returned when an id is absent from both buckets.
-var ErrNotFound = errors.New("copyzen: id not found")
+var ErrNotFound = errors.New("id not found")
 
 // Store wraps a bbolt database holding clipboard history and pins.
 type Store struct {

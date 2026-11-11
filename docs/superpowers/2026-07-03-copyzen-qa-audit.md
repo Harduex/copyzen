@@ -22,9 +22,9 @@ real store, clipboard and service were not touched. **No open finding is major.*
 | F3 | Major | Fixed | `258cf8b` (v0.5.2) |
 | F4 | Minor | Dropped | Cannot loop (see below) |
 | F5 | Minor | Minor | Rare race; outcome may be a re-own loop, not a self-heal (see below) |
-| F6 | Minor | Cosmetic | Reproduced: `--help` creates `store.db`, prints `unknown command`; `bogus` under a held lock → `timeout` after 1.96s |
-| F7 | Minor | Cosmetic | Reproduced: `copyzen: copyzen: id not found` |
-| F8 | Minor | Cosmetic | Reproduced: "1 pinned kept" with zero pins; `wipe` keeps only real pins |
+| F6 | Minor | Fixed 2026-11-11 | Was: `--help` creates `store.db`, prints `unknown command`; `bogus` under a held lock → `timeout` after 1.96s |
+| F7 | Minor | Fixed 2026-11-11 | Was: `copyzen: copyzen: id not found` |
+| F8 | Minor | Fixed 2026-11-11 | Was: "1 pinned kept" with zero pins; `wipe` keeps only real pins |
 | F9 | Minor | Dropped | Cannot happen (see below) |
 | F10 | Minor | Low | Path split reproduced; needs `XDG_DATA_HOME` set for the picker but not for systemd |
 | F11 | Minor | Negligible | Reproduced: panics at `1<<50`, fine at `1<<40`; unreachable with clipboard data |
@@ -52,7 +52,7 @@ real store, clipboard and service were not touched. **No open finding is major.*
 - **F9.** In watch mode `wl-paste` 2.2.1 has no exit-0 path: the dispatch loop ends only
   in `return 1`. All 20 service exits in the journal were `status=1/FAILURE`.
 
-Suggested priority now: F6, F7, F8 as one small batch; F2 optional (lock lifetime
+Suggested priority now: F2 optional (lock lifetime
 restructure, picker-only benefit); F5 only if it is ever observed.
 
 ## Major

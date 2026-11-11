@@ -113,10 +113,8 @@ while :; do
 		;;
 	confirm-clear)
 		# Hide the list, show counts + a warning. Enter (exit 0) confirms; Esc cancels.
-		counts=$(copyzen list | tr -d '\0' | awk -F'	' '
-			{ total++; if ($2 ~ /^★/) pinned++ }
-			END { printf "%d history items · %d pinned kept", total - pinned, pinned }')
-		printf 'Clear %s\n' "$counts" | fuzzel "$@" \
+		counts=$(copyzen count) # "<history> <pinned>"
+		printf 'Clear %d history items · %d pinned kept\n' "${counts% *}" "${counts#* }" | fuzzel "$@" \
 			--prompt '⚠ Clear ALL history? Enter = confirm · Esc = cancel ' >/dev/null
 		[ "$?" -eq 0 ] && copyzen wipe
 		state=list

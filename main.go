@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,8 @@ import (
 )
 
 var version = "dev"
+
+const usage = "usage: copyzen {store|list|count|active-index|decode|delete|pin|unpin|toggle|wipe|mimetype|version|help}"
 
 // listClipboardTypes and reownClipboard shell out to wl-clipboard; package variables
 // so tests can stub the session away.
@@ -36,12 +39,20 @@ var reownClipboard = func(mime string, data []byte) error {
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: copyzen {store|list|active-index|decode|delete|pin|unpin|toggle|wipe|mimetype|version}")
+		return errors.New(usage)
 	}
 	cmd := args[0]
-	if cmd == "version" {
+	switch cmd {
+	case "version":
 		_, err := fmt.Fprintln(stdout, version)
 		return err
+	case "help", "-h", "--help":
+		_, err := fmt.Fprintln(stdout, usage)
+		return err
+	case "store", "list", "count", "active-index", "decode", "mimetype", "delete", "pin", "unpin", "toggle", "wipe":
+	default:
+		// Rejected before the store opens, so a typo neither creates the DB nor waits on its lock.
+		return fmt.Errorf("unknown command %q", cmd)
 	}
 
 	path, err := store.DefaultPath()
@@ -101,6 +112,20 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 		_ = store.PruneThumbs(keep) // best-effort; never break listing on cache errors
 		_, err = io.WriteString(stdout, b.String())
+		return err
+	case "count":
+		// Prints "<history> <pinned>" for the picker's clear-all confirmation.
+		entries, err := s.List()
+		if err != nil {
+			return err
+		}
+		pinned := 0
+		for _, e := range entries {
+			if e.Pinned {
+				pinned++
+			}
+		}
+		_, err = fmt.Fprintf(stdout, "%d %d\n", len(entries)-pinned, pinned)
 		return err
 	case "active-index":
 		// Reads the current clipboard from stdin and prints the 0-based position of the

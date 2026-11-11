@@ -8,7 +8,7 @@ import (
 
 // FormatLine renders one list row as "id<TAB>preview". A pinned row prefixes the preview
 // with a star (★) and the live-clipboard row with a small dot (•), in that order — so a
-// pinned row always starts with ★ (the clear-confirm pin count relies on a leading ★).
+// pinned row always starts with ★.
 func FormatLine(e Entry) string {
 	prefix := ""
 	if e.Pinned {
@@ -52,7 +52,7 @@ func ParseID(s string) (uint64, error) {
 		s = s[:i]
 	}
 	if s == "" {
-		return 0, errors.New("copyzen: no id in input")
+		return 0, errors.New("no id in input")
 	}
 	return strconv.ParseUint(s, 10, 64)
 }

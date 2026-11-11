@@ -130,6 +130,7 @@ pipes straight in).
 | `copyzen toggle` | id / line | pin if unpinned, else unpin (the picker's Ctrl+S) |
 | `copyzen wipe` | — | clear history only (pins kept) |
 | `copyzen version` | — | print the version |
+| `copyzen help` | — | print the usage line (also `-h`, `--help`) |
 
 Recording is `wl-paste --no-newline --watch copyzen store` — wl-paste options must come
 **before** `--watch` (everything after `--watch` is the command it runs). Pasting back is

@@ -93,7 +93,7 @@ func Thumbnail(src []byte, maxPx int) ([]byte, error) {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
 	if w == 0 || h == 0 {
-		return nil, errors.New("copyzen: empty image")
+		return nil, errors.New("empty image")
 	}
 	tw, th := w, h
 	if w > maxPx || h > maxPx {
