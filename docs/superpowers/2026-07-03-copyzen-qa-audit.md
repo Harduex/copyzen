@@ -8,6 +8,53 @@ service were never touched. **STATIC** means code-reading only. Findings are
 deduplicated (F1 and F3 were each found independently by two agents) and ranked by
 severity.
 
+## Re-validation — 2026-11-11 (at `b9e2c1c`)
+
+This section supersedes the severities and the "Suggested priority" below; the original
+findings are kept as written. Every open finding was re-run against throwaway stores
+(temp `XDG_DATA_HOME` + `XDG_CACHE_HOME`) with stub `wl-copy`/`wl-paste` on `PATH`; the
+real store, clipboard and service were not touched. **No open finding is major.**
+
+| ID | Was | Now | Result |
+|---|---|---|---|
+| F1 | Major | Fixed | `45fa823` (v0.5.4) |
+| F2 | Major | Minor | Lock mechanism reproduced; the lost-event consequence cannot occur (see below) |
+| F3 | Major | Fixed | `258cf8b` (v0.5.2) |
+| F4 | Minor | Dropped | Cannot loop (see below) |
+| F5 | Minor | Minor | Rare race; outcome may be a re-own loop, not a self-heal (see below) |
+| F6 | Minor | Cosmetic | Reproduced: `--help` creates `store.db`, prints `unknown command`; `bogus` under a held lock → `timeout` after 1.96s |
+| F7 | Minor | Cosmetic | Reproduced: `copyzen: copyzen: id not found` |
+| F8 | Minor | Cosmetic | Reproduced: "1 pinned kept" with zero pins; `wipe` keeps only real pins |
+| F9 | Minor | Dropped | Cannot happen (see below) |
+| F10 | Minor | Low | Path split reproduced; needs `XDG_DATA_HOME` set for the picker but not for systemd |
+| F11 | Minor | Negligible | Reproduced: panics at `1<<50`, fine at `1<<40`; unreachable with clipboard data |
+| F12, F13 | Docs | Fixed | `b9e2c1c` (v0.5.4) |
+| F14 | Docs | Dropped | README says the installer verifies the *binary's* SHA-256, which is accurate |
+
+- **F2.** With `wl-copy` stubbed to stall 4s, a second `copyzen store` waited 1.97s,
+  printed `copyzen: timeout`, exited 1, and its payload was not recorded. But
+  `wl-paste --watch` runs one command per event and blocks on it (`waitpid` in
+  `run_paste_command`, wl-clipboard 2.2.1 `src/wl-paste.c`), so the recorder never runs
+  two `store` processes at once and no event is lost to the lock. The real effect is on
+  the picker and manual commands: they fail with `timeout` while a re-own stalls longer
+  than the 2s lock timeout. The journal shows no `copyzen: timeout` line since 2026-10-26.
+- **F4.** A persistent write failure fails `Add` first, so `persistImage` never runs. A
+  one-off marker loss costs exactly one extra re-own: the next round sets the marker and
+  its echo is consumed (simulated by clearing the marker between an event and its echo).
+- **F5.** Confirmed that the gate compares only the live mime list and re-owns the
+  event's bytes. Follow-on found in simulation: once two different single-mime images
+  interleave, each event finds the *other* image's marker, so every event re-owns — 12
+  `wl-copy` calls for 12 alternating events. The trigger needs two image copies within
+  the milliseconds one `store` takes. **Not tested on a live session:** whether a
+  superseded Wayland offer still delivers its data decides if the loop can sustain.
+- **F8.** Related cosmetic issue: a history entry whose text starts with `★` renders
+  identically to a pinned row in the picker.
+- **F9.** In watch mode `wl-paste` 2.2.1 has no exit-0 path: the dispatch loop ends only
+  in `return 1`. All 20 service exits in the journal were `status=1/FAILURE`.
+
+Suggested priority now: F6, F7, F8 as one small batch; F2 optional (lock lifetime
+restructure, picker-only benefit); F5 only if it is ever observed.
+
 ## Major
 
 ### F1 — Text starting with `BM` (or `GIF87a`/`GIF89a`) is misclassified as an image
